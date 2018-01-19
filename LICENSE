@@ -1,3 +1,9 @@
+The httprouter part obey the original user's LICENSE, which can be found
+in here: https://github.com/julienschmidt/httprouter/blob/master/LICENSE
+
+The rest of code(all except httprouter part) is published at GPLv3 as below.
+
+
                     GNU GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
 
