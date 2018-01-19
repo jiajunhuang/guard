@@ -178,6 +178,49 @@ func TestTreeAddAndGet(t *testing.T) {
 	checkMaxParams(t, tree)
 }
 
+func TestTreeGenericAddAndGet(t *testing.T) {
+	tree := &node{}
+
+	routes := [...]string{
+		"/hi",
+		"/contact",
+		"/co",
+		"/c",
+		"/a",
+		"/ab",
+		"/doc/",
+		"/doc/go_faq.html",
+		"/doc/go1.html",
+		"/α",
+		"/β",
+	}
+	for _, route := range routes {
+		tree.addRoute(route, fakeHandler(route))
+	}
+
+	//printChildren(tree, "")
+	checkGenericURLRequests(
+		t,
+		tree,
+		testGenericRequests{
+			{"/a", false, "/a", "/a"},
+			{"/", true, "", ""},
+			{"/hi", false, "/hi", "/hi"},
+			{"/contact", false, "/contact", "/contact"},
+			{"/co", false, "/co", "/co"},
+			{"/con", true, "", ""},  // key mismatch
+			{"/cona", true, "", ""}, // key mismatch
+			{"/no", true, "", ""},   // no matching child
+			{"/ab", false, "/ab", "/ab"},
+			{"/α", false, "/α", "/α"},
+			{"/β", false, "/β", "/β"},
+		},
+	)
+
+	checkPriorities(t, tree)
+	checkMaxParams(t, tree)
+}
+
 func TestTreeWildcard(t *testing.T) {
 	tree := &node{}
 
@@ -242,6 +285,7 @@ func TestTreeWildcardGenericURL(t *testing.T) {
 		"/doc/go1.html",
 		"/info/:user/public",
 		"/info/:user/project/:project",
+		"/this/is/a/star/*name",
 	}
 	for _, route := range routes {
 		tree.addRoute(route, fakeHandler(route))
@@ -265,6 +309,9 @@ func TestTreeWildcardGenericURL(t *testing.T) {
 			{"/files/js/inc/framework.js", false, "/files/:dir/*filepath", "/files/:/*"},
 			{"/info/gordon/public", false, "/info/:user/public", "/info/:/public"},
 			{"/info/gordon/project/go", false, "/info/:user/project/:project", "/info/:/project/:"},
+			{"/this/is/a/star/company", false, "/this/is/a/star/*name", "/this/is/a/star/*"},
+			{"/this/is/a/star/", false, "/this/is/a/star/*name", "/this/is/a/star/*"},
+			{"/this/is/a/star", true, "/this/is/a/star/*name", ""},
 		},
 	)
 
