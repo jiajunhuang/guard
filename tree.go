@@ -322,6 +322,130 @@ func (n *node) insertChild(numParams uint8, path, fullPath string, handle Handle
 	n.handle = handle
 }
 
+// returns a generic path which may contains wildcards
+// for example, if we've registed a URL pattern like: `/user/:name/hello`
+// and the given path is `/user/jhon/hello`, this function return `/user/:/hello`
+func (n *node) genericURL(path string) (handle Handle, url string, tsr bool) {
+	var urlBytes = make([]byte, len(path)+1) // store final result temporarily
+	var offset = 0                           // what's the index of cursor(or, which index next write should use)
+
+walk: // outer loop for walking the tree
+	for {
+		if len(path) > len(n.path) {
+			if path[:len(n.path)] == n.path {
+				length := len(n.path)
+				copy(urlBytes[offset:], []byte(path[:length]))
+				offset += length
+
+				path = path[length:]
+				// If this node does not have a wildcard (param or catchAll)
+				// child,  we can just look up the next child node and continue
+				// to walk down the tree
+				if !n.wildChild {
+					c := path[0]
+					for i := 0; i < len(n.indices); i++ {
+						if c == n.indices[i] {
+							n = n.children[i]
+							continue walk
+						}
+					}
+
+					// Nothing found.
+					// We can recommend to redirect to the same URL without a
+					// trailing slash if a leaf exists for that path.
+					tsr = (path == "/" && n.handle != nil)
+					return nil, string(urlBytes[:offset]), tsr
+				}
+
+				// handle wildcard child
+				n = n.children[0]
+				switch n.nType {
+				case param:
+					// find param end (either '/' or path end)
+					urlBytes[offset] = ':'
+					offset++
+
+					end := 0
+					for end < len(path) && path[end] != '/' {
+						end++
+					}
+
+					// we need to go deeper!
+					if end < len(path) {
+						if len(n.children) > 0 {
+							path = path[end:]
+							n = n.children[0]
+							continue walk
+						}
+
+						// ... but we can't
+						tsr = (len(path) == end+1)
+						return nil, string(urlBytes[:offset]), tsr
+					}
+
+					if handle = n.handle; handle != nil {
+						return handle, string(urlBytes[:offset]), tsr
+					} else if len(n.children) == 1 {
+						// No handle found. Check if a handle for this path + a
+						// trailing slash exists for TSR recommendation
+						n = n.children[0]
+						tsr = (n.path == "/" && n.handle != nil)
+					}
+
+					return nil, string(urlBytes[:offset]), tsr
+
+				case catchAll:
+					urlBytes[offset] = '/'
+					offset++
+					urlBytes[offset] = '*'
+					offset++
+
+					handle = n.handle
+					return handle, string(urlBytes[:offset]), tsr
+
+				default:
+					panic("invalid node type")
+				}
+			}
+		} else if path == n.path {
+			length := len(n.path)
+			copy(urlBytes[offset:], []byte(path))
+			offset += length
+
+			// We should have reached the node containing the handle.
+			// Check if this node has a handle registered.
+			if handle = n.handle; handle != nil {
+				return handle, string(urlBytes[:offset]), tsr
+			}
+
+			if path == "/" && n.wildChild && n.nType != root {
+				tsr = true
+				return nil, string(urlBytes[:offset]), tsr
+			}
+
+			// No handle found. Check if a handle for this path + a
+			// trailing slash exists for trailing slash recommendation
+			for i := 0; i < len(n.indices); i++ {
+				if n.indices[i] == '/' {
+					n = n.children[i]
+					tsr = (len(n.path) == 1 && n.handle != nil) ||
+						(n.nType == catchAll && n.children[0].handle != nil)
+					return nil, string(urlBytes[:offset]), tsr
+				}
+			}
+
+			return nil, string(urlBytes[:offset]), tsr
+		}
+
+		// Nothing found. We can recommend to redirect to the same URL with an
+		// extra trailing slash if a leaf exists for that path
+		tsr = (path == "/") ||
+			(len(n.path) == len(path)+1 && n.path[len(path)] == '/' &&
+				path == n.path[:len(n.path)-1] && n.handle != nil)
+		return nil, string(urlBytes[:offset]), tsr
+	}
+}
+
 // Returns the handle registered with the given path (key). The values of
 // wildcards are saved to a map.
 // If no handle can be found, a TSR (trailing slash redirect) recommendation is

@@ -39,6 +39,13 @@ type testRequests []struct {
 	ps         Params
 }
 
+type testGenericRequests []struct {
+	path       string
+	nilHandler bool
+	route      string
+	expected   string
+}
+
 func checkRequests(t *testing.T, tree *node, requests testRequests) {
 	for _, request := range requests {
 		handler, ps, _ := tree.getValue(request.path)
@@ -58,6 +65,24 @@ func checkRequests(t *testing.T, tree *node, requests testRequests) {
 
 		if !reflect.DeepEqual(ps, request.ps) {
 			t.Errorf("Params mismatch for route '%s'", request.path)
+		}
+	}
+}
+
+func checkGenericURLRequests(t *testing.T, tree *node, requests testGenericRequests) {
+	for _, request := range requests {
+		handler, genericURL, _ := tree.genericURL(request.path)
+
+		if handler == nil && !request.nilHandler {
+			// handler should found
+			t.Errorf("handle mismatch for route '%s': Expected non-nil handle", request.path)
+		} else if request.nilHandler && handler != nil {
+			// handler should not found
+			t.Errorf("handle mismatch for route '%s': Expected no handle", request.path)
+		}
+
+		if !request.nilHandler && handler != nil && genericURL != request.expected {
+			t.Errorf("execute genericURL failed for route '%s': Expected %s, got: %s", request.route, request.expected, genericURL)
 		}
 	}
 }
@@ -194,6 +219,54 @@ func TestTreeWildcard(t *testing.T) {
 		{"/info/gordon/public", false, "/info/:user/public", Params{Param{"user", "gordon"}}},
 		{"/info/gordon/project/go", false, "/info/:user/project/:project", Params{Param{"user", "gordon"}, Param{"project", "go"}}},
 	})
+
+	checkPriorities(t, tree)
+	checkMaxParams(t, tree)
+}
+
+func TestTreeWildcardGenericURL(t *testing.T) {
+	tree := &node{}
+
+	routes := [...]string{
+		"/",
+		"/cmd/:tool/:sub",
+		"/cmd/:tool/",
+		"/src/*filepath",
+		"/search/",
+		"/search/:query",
+		"/user_:name",
+		"/user_:name/about",
+		"/files/:dir/*filepath",
+		"/doc/",
+		"/doc/go_faq.html",
+		"/doc/go1.html",
+		"/info/:user/public",
+		"/info/:user/project/:project",
+	}
+	for _, route := range routes {
+		tree.addRoute(route, fakeHandler(route))
+	}
+
+	checkGenericURLRequests(
+		t,
+		tree,
+		testGenericRequests{
+			{"/", false, "/", "/"},
+			{"/cmd/test/", false, "/cmd/:tool/", "/cmd/:/"},
+			{"/cmd/test", true, "", ""},
+			{"/cmd/test/3", false, "/cmd/:tool/:sub", "/cmd/:/:"},
+			{"/src/", false, "/src/*filepath", "/src/*"},
+			{"/src/some/file.png", false, "/src/*filepath", "/src/*"},
+			{"/search/", false, "/search/", "/search/"},
+			{"/search/someth!ng+in+ünìcodé", false, "/search/:query", "/search/:"},
+			{"/search/someth!ng+in+ünìcodé/", true, "", ""},
+			{"/user_gopher", false, "/user_:name", "/user_:"},
+			{"/user_gopher/about", false, "/user_:name/about", "/user_:/about"},
+			{"/files/js/inc/framework.js", false, "/files/:dir/*filepath", "/files/:/*"},
+			{"/info/gordon/public", false, "/info/:user/public", "/info/:/public"},
+			{"/info/gordon/project/go", false, "/info/:user/project/:project", "/info/:/project/:"},
+		},
+	)
 
 	checkPriorities(t, tree)
 	checkMaxParams(t, tree)
