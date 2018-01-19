@@ -71,7 +71,7 @@ func checkRequests(t *testing.T, tree *node, requests testRequests) {
 
 func checkGenericURLRequests(t *testing.T, tree *node, requests testGenericRequests) {
 	for _, request := range requests {
-		handler, genericURL, _ := tree.genericURL(request.path)
+		handler, genericURL, _ := tree.GenericURL(request.path)
 
 		if handler == nil && !request.nilHandler {
 			// handler should found

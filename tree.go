@@ -325,7 +325,7 @@ func (n *node) insertChild(numParams uint8, path, fullPath string, handle Handle
 // returns a generic path which may contains wildcards
 // for example, if we've registed a URL pattern like: `/user/:name/hello`
 // and the given path is `/user/jhon/hello`, this function return `/user/:/hello`
-func (n *node) genericURL(path string) (handle Handle, url string, tsr bool) {
+func (n *node) GenericURL(path string) (handle Handle, url string, tsr bool) {
 	var urlBytes = make([]byte, len(path)+1) // store final result temporarily
 	var offset = 0                           // what's the index of cursor(or, which index next write should use)
 
