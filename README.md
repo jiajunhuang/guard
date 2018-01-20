@@ -1,5 +1,7 @@
 # guard
 
+![CI](https://travis-ci.org/jiajunhuang/guard.svg?branch=master)
+
 guard is a generic high performance circuit breaker written in Go. It has four major component:
 
 - radix tree & mux: which stores registed URLs(it's a customized version [httprouter](https://github.com/julienschmidt/httprouter))
