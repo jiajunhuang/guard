@@ -162,11 +162,11 @@ type Router struct {
 }
 
 // Make sure the Router conforms with the http.Handler interface
-var _ http.Handler = New()
+var _ http.Handler = NewRouter()
 
-// New returns a new initialized Router.
+// NewRouter returns a new initialized Router.
 // Path auto-correction, including trailing slashes, is enabled by default.
-func New() *Router {
+func NewRouter() *Router {
 	return &Router{
 		RedirectTrailingSlash:  true,
 		RedirectFixedPath:      true,
@@ -291,6 +291,14 @@ func (r *Router) Lookup(method, path string) (Handle, Params, bool) {
 		return root.getValue(path)
 	}
 	return nil, nil, false
+}
+
+// GenericURL is a wrapper for node.genericURL
+func (r *Router) GenericURL(method, path string) (handler Handle, url string, tsr bool) {
+	if root := r.trees[method]; root != nil {
+		return root.genericURL(path)
+	}
+	return nil, "", false
 }
 
 func (r *Router) allowed(path, reqMethod string) (allow string) {
