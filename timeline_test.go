@@ -32,6 +32,8 @@ func TestTimelineIncr(t *testing.T) {
 	time.Sleep(1)
 
 	// the oldest should been removed
+	tl.lock.Lock()
+	defer tl.lock.Unlock()
 	if tl.head.key <= oldest {
 		t.Fatalf("the oldest bucket should been removed!")
 	}
