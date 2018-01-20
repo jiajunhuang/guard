@@ -1,6 +1,6 @@
 # guard
 
-![CI](https://travis-ci.org/jiajunhuang/guard.svg?branch=master)
+[![Build Status](https://travis-ci.org/jiajunhuang/guard.svg?branch=master)](https://travis-ci.org/jiajunhuang/guard)
 
 guard is a generic high performance circuit breaker written in Go. It has four major component:
 
