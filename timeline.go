@@ -99,8 +99,9 @@ func (t *Timeline) GCWorker() {
 		// lock
 		t.lock.Lock()
 
-		if t.head == nil {
-			panic("timelist should always has at least one bucket, but now head is pointer to nil")
+		if t.head == nil && t.tail == nil {
+			// nothing in the timelist, this means the timelist had been removed
+			return
 		}
 
 		// check if head is outdated
