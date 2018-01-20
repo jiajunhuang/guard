@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -15,6 +16,11 @@ type Backend struct {
 	Host   string
 	Port   int
 	Weight int
+}
+
+// ToURL return a string that is host:port style
+func (b Backend) ToURL() string {
+	return fmt.Sprintf("%s:%d", b.Host, b.Port)
 }
 
 // Balancer should have a method `Select`, which return the backend we should
