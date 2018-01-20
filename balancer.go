@@ -13,9 +13,9 @@ https://github.com/nginx/nginx/commit/52327e0627f49dbda1e8db695e63a4b0af4448b1
 
 // Backend is the backend server, usally a app server like: gunicorn+flask
 type Backend struct {
-	Host   string
-	Port   int
-	Weight int
+	Host   string `json:"host"`
+	Port   int    `json:"port"`
+	Weight int    `json:"weight"`
 }
 
 // ToURL return a string that is host:port style

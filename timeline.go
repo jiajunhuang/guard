@@ -31,6 +31,11 @@ const (
 	maxBuckets = 60 // we store `maxBuckets` buckets
 )
 
+// BucketKey generate bucket key
+func BucketKey(url string, code int) string {
+	return fmt.Sprintf("%s@%d", url, code)
+}
+
 // RightNow return latest bucket key
 func RightNow() int {
 	t := time.Now()
@@ -90,34 +95,32 @@ func (t *Timeline) Incr(genericURL string, code int) uint32 {
 	}
 
 	t.tail.counter[key]++
+
+	// check if head is outdated
+	oldest := RightNow() - bucketStep*maxBuckets
+	for {
+		if t.head.key < oldest {
+			t.head = t.head.next
+		} else {
+			break
+		}
+	}
+
 	return t.tail.counter[key]
 }
 
-// GCWorker scan the linked list, remove those outdated bucket
-func (t *Timeline) GCWorker() {
-	for {
-		// lock
-		t.lock.Lock()
+// QueryStatus return counts of status 200, 429, 500, 502, and failure ratio
+func (t *Timeline) QueryStatus(url string) (uint32, uint32, uint32, uint32, float64) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
 
-		if t.head == nil && t.tail == nil {
-			// nothing in the timelist, this means the timelist had been removed
-			return
-		}
+	tail := t.tail
 
-		// check if head is outdated
-		oldest := RightNow() - bucketStep*maxBuckets
-		for {
-			if t.head.key < oldest {
-				t.head = t.head.next
-			} else {
-				break
-			}
-		}
+	count200 := tail.counter[BucketKey(url, 200)]
+	count429 := tail.counter[BucketKey(url, 429)]
+	count500 := tail.counter[BucketKey(url, 500)]
+	count502 := tail.counter[BucketKey(url, 502)]
+	ratio := 1 - float64(count200)/float64(count200+count429+count500+count502)
 
-		// unlock
-		t.lock.Unlock()
-
-		// sleep
-		time.Sleep(bucketStep)
-	}
+	return count200, count429, count500, count502, ratio
 }

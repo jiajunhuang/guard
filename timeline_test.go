@@ -2,7 +2,6 @@ package main
 
 import (
 	"testing"
-	"time"
 )
 
 func TestRightNow(t *testing.T) {
@@ -26,15 +25,4 @@ func TestTimelineIncr(t *testing.T) {
 	tl.head = originHead
 
 	tl.Incr("/user/:/hello", 200)
-
-	go tl.GCWorker()
-	tl.Incr("/user/:/hello", 200)
-	time.Sleep(1)
-
-	// the oldest should been removed
-	tl.lock.Lock()
-	defer tl.lock.Unlock()
-	if tl.head.key <= oldest {
-		t.Fatalf("the oldest bucket should been removed!")
-	}
 }

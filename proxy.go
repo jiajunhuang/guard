@@ -10,8 +10,8 @@ import (
 )
 
 // Proxy use httputil.ReverseProxy
-func Proxy(wrr *WRR, w ResponseWriter, r *http.Request) {
-	backend, found := wrr.Select()
+func Proxy(balancer Balancer, w ResponseWriter, r *http.Request) {
+	backend, found := balancer.Select()
 	if !found {
 		w.WriteHeader(http.StatusForbidden)
 		return
