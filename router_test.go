@@ -528,3 +528,28 @@ func TestRouterServeFiles(t *testing.T) {
 		t.Error("serving file failed")
 	}
 }
+
+func TestRouterGenericURL(t *testing.T) {
+	router := NewRouter()
+	router.GET("/user/:name/hello", fakeProxyHandler)
+
+	_, url, tsr := router.GenericURL("GET", "/user/jhon/hello")
+	if url != "/user/:/hello" || tsr != false {
+		t.Errorf("url should be `/user/:/hello` and tsr should be false, but got: %s, %t", url, tsr)
+	}
+
+	_, url, tsr = router.GenericURL("GET", "/user/jhon/hello/")
+	if tsr != true {
+		t.Errorf("tsr should be true, but got: %t", tsr)
+	}
+
+	handler, url, tsr := router.GenericURL("GET", "/halo/jhon/hello/")
+	if tsr != false || url != "" || handler != nil {
+		t.Errorf("nothing should been found, but got: %+v, %s, %t", handler, url, tsr)
+	}
+
+	handler, url, tsr = router.GenericURL("POST", "/halo/jhon/hello/")
+	if tsr != false || url != "" || handler != nil {
+		t.Errorf("nothing should been found, but got: %+v, %s, %t", handler, url, tsr)
+	}
+}

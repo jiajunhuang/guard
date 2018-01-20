@@ -26,3 +26,55 @@ func TestTimelineIncr(t *testing.T) {
 
 	tl.Incr("/user/:/hello", 200)
 }
+
+func TestBucketKey(t *testing.T) {
+	r := BucketKey("/user/:/hello", 200)
+	if r != "/user/:/hello@200" {
+		t.Errorf("`BucketKey` should return `/user/:/hello@200`, but got: %s", r)
+	}
+}
+
+func TestQueryStatus(t *testing.T) {
+	tl := NewTimeline()
+	url := "/user/:/hello"
+	tl.Incr(url, 200)
+	tl.Incr(url, 429)
+	tl.Incr(url, 500)
+	tl.Incr(url, 502)
+
+	c200, c429, c500, c502, _ := tl.QueryStatus(url)
+	if c200 != 1 || c429 != 1 || c500 != 1 || c502 != 1 {
+		t.Errorf("timebucket incr error, status of 200, 429, 500, 502 should be one")
+	}
+}
+
+func TestIncrWithNilTail(t *testing.T) {
+	defer func() {
+		err := recover()
+		if err == nil {
+			t.Error("timeline.Incr should panic because it's tail is nil, but it not")
+		}
+	}()
+
+	tl := NewTimeline()
+	tl.tail = nil
+	url := "/user/:/hello"
+	code := 200
+
+	tl.Incr(url, code)
+}
+
+func TestQueryStatusWithNilTail(t *testing.T) {
+	defer func() {
+		err := recover()
+		if err == nil {
+			t.Error("timeline.QueryStatus should panic because it's tail is nil, but it not")
+		}
+	}()
+
+	tl := NewTimeline()
+	tl.tail = nil
+	url := "/user/:/hello"
+
+	tl.QueryStatus(url)
+}

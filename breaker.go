@@ -42,7 +42,7 @@ func (b *Breaker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var exist bool
 	router, exist := b.routers[app]
 	if !exist {
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("app " + app + " not exist, please contact admin to update the configuration"))
 		return
 	}
@@ -52,9 +52,21 @@ func (b *Breaker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !exist {
 		panic("timeline of app " + app + "does not exist, it should been create in registration")
 	}
-	_, url, tsr := router.GenericURL(r.Method, r.URL.Path)
-	if tsr {
-		// redirect
+	path := r.URL.Path
+	_, url, tsr := router.GenericURL(r.Method, path)
+	if tsr && router.RedirectTrailingSlash {
+		code := 301 // Permanent redirect, request with GET method
+		if r.Method != "GET" {
+			// Temporary redirect, request with same method
+			// As of Go 1.3, Go does not support status code 308.
+			code = 307
+		}
+		if len(path) > 1 && path[len(path)-1] == '/' {
+			r.URL.Path = path[:len(path)-1]
+		} else {
+			r.URL.Path = path + "/"
+		}
+		http.Redirect(w, r, r.URL.String(), code)
 		return
 	}
 	_, _, _, _, ratio := timeline.QueryStatus(url)
@@ -72,5 +84,5 @@ func (b *Breaker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	Proxy(balancer, *responseWriter, r)
 
 	// record the response
-	timeline.Incr(url, responseWriter.status)
+	timeline.Incr(url, responseWriter.Status())
 }

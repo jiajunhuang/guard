@@ -41,6 +41,16 @@ type APP struct {
 
 func fakeProxyHandler(w http.ResponseWriter, r *http.Request, _ Params) {}
 
+func overrideAPP(breaker *Breaker, app APP) {
+	breaker.UpdateAPP(app.Name)
+	router := breaker.routers[app.Name]
+
+	for i, url := range app.URLs {
+		router.Handle(strings.ToUpper(app.Methods[i]), url, fakeProxyHandler)
+	}
+	breaker.balancers[app.Name] = NewWRR(app.Backends...)
+}
+
 func createAPPHandler(w http.ResponseWriter, r *http.Request, _ Params) {
 	var app APP
 	var err error
@@ -63,13 +73,7 @@ func createAPPHandler(w http.ResponseWriter, r *http.Request, _ Params) {
 	}
 
 	log.Printf("gonna insert or over write app %s's configuration", app.Name)
-	breaker.UpdateAPP(app.Name)
-	router := breaker.routers[app.Name]
-
-	for i, url := range app.URLs {
-		router.Handle(strings.ToUpper(app.Methods[i]), url, fakeProxyHandler)
-	}
-	breaker.balancers[app.Name] = NewWRR(app.Backends...)
+	overrideAPP(breaker, app)
 
 	fmt.Fprintf(w, "success!")
 }

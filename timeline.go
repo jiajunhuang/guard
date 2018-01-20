@@ -114,13 +114,17 @@ func (t *Timeline) QueryStatus(url string) (uint32, uint32, uint32, uint32, floa
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
+	if t.tail == nil {
+		panic("timelist should always has at least one bucket, but now tail is pointer to nil")
+	}
+
 	tail := t.tail
 
 	count200 := tail.counter[BucketKey(url, 200)]
 	count429 := tail.counter[BucketKey(url, 429)]
 	count500 := tail.counter[BucketKey(url, 500)]
 	count502 := tail.counter[BucketKey(url, 502)]
-	ratio := 1 - float64(count200)/float64(count200+count429+count500+count502)
+	ratio := float64(count429+count500+count502) / float64(count200+count429+count500+count502+1)
 
 	return count200, count429, count500, count502, ratio
 }
