@@ -60,7 +60,7 @@ func NewBucket(key int) *Bucket {
 
 // Timeline is a singly linked list wrapper
 type Timeline struct {
-	lock sync.Mutex
+	lock sync.RWMutex
 	head *Bucket
 	tail *Bucket
 }
@@ -111,8 +111,8 @@ func (t *Timeline) Incr(genericURL string, code int) uint32 {
 
 // QueryStatus return counts of status 200, 429, 500, 502, and failure ratio
 func (t *Timeline) QueryStatus(url string) (uint32, uint32, uint32, uint32, float64) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 
 	tail := t.tail
 
