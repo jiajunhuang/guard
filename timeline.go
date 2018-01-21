@@ -3,6 +3,7 @@ package main
 import (
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -110,28 +111,21 @@ func (t *Timeline) Incr(url string, code int) uint32 {
 		t.tail.counter[url] = status
 	}
 
-	var v uint32
-	switch code {
-	case 200:
-		status.OK++
-		v = status.OK
-	case 429:
-		status.TooManyRequests++
-		v = status.TooManyRequests
-	case 500:
-		status.InternalError++
-		v = status.InternalError
-	case 502:
-		status.BadGateway++
-		v = status.BadGateway
-	default:
-		panic("bad status code" + strconv.Itoa(code))
-	}
-
 	// defer is too slow
 	t.lock.Unlock()
 
-	return v
+	switch code {
+	case 200:
+		return atomic.AddUint32(&status.OK, 1)
+	case 429:
+		return atomic.AddUint32(&status.TooManyRequests, 1)
+	case 500:
+		return atomic.AddUint32(&status.InternalError, 1)
+	case 502:
+		return atomic.AddUint32(&status.BadGateway, 1)
+	default:
+		panic("bad status code" + strconv.Itoa(code))
+	}
 }
 
 // QueryStatus return counts of status 200, 429, 500, 502, and failure ratio
