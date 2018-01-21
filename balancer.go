@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"strconv"
 	"sync"
 )
 
@@ -20,7 +20,7 @@ type Backend struct {
 
 // ToURL return a string that is host:port style
 func (b Backend) ToURL() string {
-	return fmt.Sprintf("%s:%d", b.Host, b.Port)
+	return b.Host + ":" + strconv.Itoa(b.Port)
 }
 
 // Balancer should have a method `Select`, which return the backend we should
@@ -55,7 +55,6 @@ func NewWRR(backends ...Backend) *WRR {
 // [1, 1, 2, 1, 3, 1, 1]
 func (w *WRR) Select() (b *Backend, found bool) {
 	w.lock.Lock()
-	defer w.lock.Unlock()
 
 	totalWeight := w.totalWeight
 	upstream := w.upstream
@@ -75,8 +74,14 @@ func (w *WRR) Select() (b *Backend, found bool) {
 	if biggest >= 0 && biggest < len(weights) {
 		weights[biggest] -= totalWeight
 
+		// defer is too slow...
+		w.lock.Unlock()
+
 		return &w.upstream[biggest], true
 	}
+
+	// defer is too slow...
+	w.lock.Unlock()
 
 	return nil, false
 }

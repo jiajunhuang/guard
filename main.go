@@ -58,12 +58,12 @@ func createAPPHandler(w http.ResponseWriter, r *http.Request, _ Params) {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, "failed: "+err.Error())
+		w.Write([]byte("failed" + err.Error()))
 		return
 	}
 	if err = json.Unmarshal(body, &app); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, "failed: "+err.Error())
+		w.Write([]byte("failed" + err.Error()))
 		return
 	}
 	if len(app.Methods) != len(app.URLs) {

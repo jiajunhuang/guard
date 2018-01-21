@@ -19,7 +19,7 @@ func TestTimelineIncr(t *testing.T) {
 	originHead := tl.head
 	// create buckets manually
 	for i := maxBuckets; i > 0; i-- {
-		tl.head.next = NewBucket(now - i*bucketStep)
+		tl.head.next = NewBucket(now - int64(i*bucketStep))
 		tl.head = tl.head.next
 	}
 	tl.head = originHead
@@ -97,5 +97,11 @@ func BenchmarkQueryStatus(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		tl.QueryStatus("/user/:/hello")
+	}
+}
+
+func BenchmarkBucketKey(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		BucketKey("/user/:/hello", 200)
 	}
 }

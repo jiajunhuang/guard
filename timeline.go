@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -33,13 +32,12 @@ const (
 
 // BucketKey generate bucket key
 func BucketKey(url string, code int) string {
-	return fmt.Sprintf("%s@%d", url, code)
+	return url + "@" + strconv.Itoa(code)
 }
 
 // RightNow return latest bucket key
-func RightNow() int {
-	t := time.Now()
-	ts, _ := strconv.Atoi(t.Format("20060102150405"))
+func RightNow() int64 {
+	ts := time.Now().Unix()
 	return ts - ts%bucketStep
 }
 
@@ -48,13 +46,13 @@ type Counter map[string]uint32
 
 // Bucket is bucket in timeline
 type Bucket struct {
-	key     int
+	key     int64
 	counter Counter
 	next    *Bucket
 }
 
 // NewBucket return a brand new bucket with given key
-func NewBucket(key int) *Bucket {
+func NewBucket(key int64) *Bucket {
 	return &Bucket{key: key, counter: make(Counter)}
 }
 
@@ -77,12 +75,11 @@ func NewTimeline() *Timeline {
 
 // Incr increase by 1 on the given genericURL and status code, return value after incr
 func (t *Timeline) Incr(genericURL string, code int) uint32 {
-	key := fmt.Sprintf("%s@%d", genericURL, code)
+	key := BucketKey(genericURL, code)
 	now := RightNow()
 
 	// lock...
 	t.lock.Lock()
-	defer t.lock.Unlock()
 
 	if t.tail == nil {
 		panic("timelist should always has at least one bucket, but now tail is pointer to nil")
@@ -94,8 +91,6 @@ func (t *Timeline) Incr(genericURL string, code int) uint32 {
 		t.tail = b
 	}
 
-	t.tail.counter[key]++
-
 	// check if head is outdated
 	oldest := RightNow() - bucketStep*maxBuckets
 	for {
@@ -106,13 +101,18 @@ func (t *Timeline) Incr(genericURL string, code int) uint32 {
 		}
 	}
 
-	return t.tail.counter[key]
+	t.tail.counter[key]++
+	v := t.tail.counter[key]
+
+	// defer is too slow
+	t.lock.Unlock()
+
+	return v
 }
 
 // QueryStatus return counts of status 200, 429, 500, 502, and failure ratio
 func (t *Timeline) QueryStatus(url string) (uint32, uint32, uint32, uint32, float64) {
 	t.lock.RLock()
-	defer t.lock.RUnlock()
 
 	if t.tail == nil {
 		panic("timelist should always has at least one bucket, but now tail is pointer to nil")
@@ -125,6 +125,9 @@ func (t *Timeline) QueryStatus(url string) (uint32, uint32, uint32, uint32, floa
 	count500 := tail.counter[BucketKey(url, 500)]
 	count502 := tail.counter[BucketKey(url, 502)]
 	ratio := float64(count429+count500+count502) / float64(count200+count429+count500+count502+1)
+
+	// defer is too slow
+	t.lock.RUnlock()
 
 	return count200, count429, count500, count502, ratio
 }
