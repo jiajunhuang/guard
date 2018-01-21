@@ -30,19 +30,22 @@ const (
 	maxBuckets = 60 // we store `maxBuckets` buckets
 )
 
-// BucketKey generate bucket key
-func BucketKey(url string, code int) string {
-	return url + "@" + strconv.Itoa(code)
-}
-
 // RightNow return latest bucket key
 func RightNow() int64 {
 	ts := time.Now().Unix()
 	return ts - ts%bucketStep
 }
 
+// Status is an collection of status: 200, 429, 500, 502
+type Status struct {
+	OK              uint32 `json:"ok"`
+	TooManyRequests uint32 `json:"too_many_requests"`
+	InternalError   uint32 `json:"internal_error"`
+	BadGateway      uint32 `json:"bad_gateway"`
+}
+
 // Counter counts value of key
-type Counter map[string]uint32
+type Counter map[string]*Status
 
 // Bucket is bucket in timeline
 type Bucket struct {
@@ -74,8 +77,7 @@ func NewTimeline() *Timeline {
 }
 
 // Incr increase by 1 on the given genericURL and status code, return value after incr
-func (t *Timeline) Incr(genericURL string, code int) uint32 {
-	key := BucketKey(genericURL, code)
+func (t *Timeline) Incr(url string, code int) uint32 {
 	now := RightNow()
 
 	// lock...
@@ -101,8 +103,30 @@ func (t *Timeline) Incr(genericURL string, code int) uint32 {
 		}
 	}
 
-	t.tail.counter[key]++
-	v := t.tail.counter[key]
+	var status *Status
+	status = t.tail.counter[url]
+	if status == nil {
+		status = &Status{}
+		t.tail.counter[url] = status
+	}
+
+	var v uint32
+	switch code {
+	case 200:
+		status.OK++
+		v = status.OK
+	case 429:
+		status.TooManyRequests++
+		v = status.TooManyRequests
+	case 500:
+		status.InternalError++
+		v = status.InternalError
+	case 502:
+		status.BadGateway++
+		v = status.BadGateway
+	default:
+		panic("bad status code" + strconv.Itoa(code))
+	}
 
 	// defer is too slow
 	t.lock.Unlock()
@@ -115,19 +139,27 @@ func (t *Timeline) QueryStatus(url string) (uint32, uint32, uint32, uint32, floa
 	t.lock.RLock()
 
 	if t.tail == nil {
-		panic("timelist should always has at least one bucket, but now tail is pointer to nil")
+		panic("t.tail should never be nil")
 	}
 
 	tail := t.tail
 
-	count200 := tail.counter[BucketKey(url, 200)]
-	count429 := tail.counter[BucketKey(url, 429)]
-	count500 := tail.counter[BucketKey(url, 500)]
-	count502 := tail.counter[BucketKey(url, 502)]
-	ratio := float64(count429+count500+count502) / float64(count200+count429+count500+count502+1)
+	var status *Status
+	status = tail.counter[url]
+	if status == nil {
+		status = &Status{}
+		t.tail.counter[url] = status
+	}
+
+	ok, too, internal, bad := status.OK, status.TooManyRequests, status.InternalError, status.BadGateway
+	ratio := float64(
+		too+internal+bad,
+	) / float64(
+		1+ok+too+internal+bad,
+	)
 
 	// defer is too slow
 	t.lock.RUnlock()
 
-	return count200, count429, count500, count502, ratio
+	return ok, too, internal, bad, ratio
 }

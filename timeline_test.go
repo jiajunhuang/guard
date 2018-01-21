@@ -28,9 +28,9 @@ func TestTimelineIncr(t *testing.T) {
 }
 
 func TestBucketKey(t *testing.T) {
-	r := BucketKey("/user/:/hello", 200)
-	if r != "/user/:/hello@200" {
-		t.Errorf("`BucketKey` should return `/user/:/hello@200`, but got: %s", r)
+	r := "/user/:/hello"
+	if r != "/user/:/hello" {
+		t.Errorf("`BucketKey` should return `/user/:/hello`, but got: %s", r)
 	}
 }
 
@@ -42,6 +42,7 @@ func TestQueryStatus(t *testing.T) {
 	tl.Incr(url, 500)
 	tl.Incr(url, 502)
 
+	t.Logf("bucket: %+v, counter: %+v", tl.tail, tl.tail.counter[url])
 	c200, c429, c500, c502, _ := tl.QueryStatus(url)
 	if c200 != 1 || c429 != 1 || c500 != 1 || c502 != 1 {
 		t.Errorf("timebucket incr error, status of 200, 429, 500, 502 should be one")
@@ -60,6 +61,21 @@ func TestIncrWithNilTail(t *testing.T) {
 	tl.tail = nil
 	url := "/user/:/hello"
 	code := 200
+
+	tl.Incr(url, code)
+}
+
+func TestIncrWithBadCode(t *testing.T) {
+	defer func() {
+		err := recover()
+		if err == nil {
+			t.Error("timeline.Incr should panic because code is invalid, but it not")
+		}
+	}()
+
+	tl := NewTimeline()
+	url := "/user/:/hello"
+	code := 1024
 
 	tl.Incr(url, code)
 }
@@ -97,11 +113,5 @@ func BenchmarkQueryStatus(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		tl.QueryStatus("/user/:/hello")
-	}
-}
-
-func BenchmarkBucketKey(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		BucketKey("/user/:/hello", 200)
 	}
 }

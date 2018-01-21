@@ -73,6 +73,7 @@ func (b *Breaker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, _, _, _, ratio := timeline.QueryStatus(url)
+	log.Printf("ratio: %f", ratio)
 	if ratio > 0.3 {
 		log.Printf("too many requests, ratio is %f", ratio)
 		w.WriteHeader(http.StatusTooManyRequests)
