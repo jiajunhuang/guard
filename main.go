@@ -68,7 +68,7 @@ func createAPPHandler(w http.ResponseWriter, r *http.Request, _ Params) {
 	}
 	if len(app.Methods) != len(app.URLs) {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, "failed: methods and urls should have same length and 1:1")
+		w.Write([]byte("failed: methods and urls should have same length and 1:1"))
 		return
 	}
 
@@ -78,6 +78,37 @@ func createAPPHandler(w http.ResponseWriter, r *http.Request, _ Params) {
 	fmt.Fprintf(w, "success!")
 }
 
+func inspectAPPHandler(w http.ResponseWriter, r *http.Request, ps Params) {
+	type jsonObject map[string]interface{}
+
+	app := ps.ByName("app")
+	jsonBody := jsonObject{}
+	jsonBytes := []byte{}
+	tl := breaker.timelines[app]
+	if tl == nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	tl.lock.RLock()
+	defer tl.lock.RUnlock()
+
+	cursor := tl.head
+	jsonBody["app"] = app
+	counters := []Counter{}
+
+	for cursor != nil {
+		counters = append(counters, cursor.counter)
+		cursor = cursor.next
+	}
+
+	jsonBody["counters"] = counters
+
+	jsonBytes, _ = json.Marshal(jsonBody)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jsonBytes)
+}
+
 func proxy() {
 	log.Fatal(http.ListenAndServe(":23456", breaker))
 }
@@ -85,6 +116,7 @@ func proxy() {
 func main() {
 	router := NewRouter()
 	router.POST("/app", createAPPHandler)
+	router.GET("/inspect/:app", inspectAPPHandler)
 
 	go proxy()
 	log.Fatal(http.ListenAndServe(":12345", router))

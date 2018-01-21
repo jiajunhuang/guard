@@ -6,6 +6,7 @@ status.
 */
 
 import (
+	"log"
 	"net/http"
 )
 
@@ -42,6 +43,7 @@ func (b *Breaker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var exist bool
 	router, exist := b.routers[app]
 	if !exist {
+		log.Printf("app %s not found", app)
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("app " + app + " not exist, please contact admin to update the configuration"))
 		return
@@ -50,7 +52,7 @@ func (b *Breaker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// if circuit breaker open?
 	timeline, exist := b.timelines[app]
 	if !exist {
-		panic("timeline of app " + app + "does not exist, it should been create in registration")
+		log.Panicf("timeline of app %s does not exist, it should been create in registration", app)
 	}
 	path := r.URL.Path
 	_, url, tsr := router.GenericURL(r.Method, path)
@@ -66,11 +68,13 @@ func (b *Breaker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		} else {
 			r.URL.Path = path + "/"
 		}
+		log.Printf("redirect to %s", r.URL.String())
 		http.Redirect(w, r, r.URL.String(), code)
 		return
 	}
 	_, _, _, _, ratio := timeline.QueryStatus(url)
 	if ratio > 0.3 {
+		log.Printf("too many requests, ratio is %f", ratio)
 		w.WriteHeader(http.StatusTooManyRequests)
 		return
 	}
@@ -78,11 +82,12 @@ func (b *Breaker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// if circuit breaker not open, proxy
 	balancer, exist := b.balancers[app]
 	if !exist {
-		panic("balancer of app " + app + "does not exist, it should been create in registration")
+		log.Panicf("balancer of app %s does not exist, it should been create in registration", app)
 	}
 	responseWriter := NewResponseWriter(w)
 	Proxy(balancer, *responseWriter, r)
 
 	// record the response
 	timeline.Incr(url, responseWriter.Status())
+	log.Printf("request returned with status code %d", responseWriter.Status())
 }
