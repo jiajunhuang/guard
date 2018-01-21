@@ -63,6 +63,7 @@ become better and better!
 - [ ] graceful restart
 - [ ] URL-level mutex(remove the bucket-level mutex to gain a better performance)
 - [ ] fallback option while circuit breaker works(maybe serve a static html page, or return some words.)
+- [ ] more test cases & benchmarks
 
 ## set it up
 
