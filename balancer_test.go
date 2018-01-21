@@ -94,3 +94,19 @@ func TestWRRNotFound(t *testing.T) {
 		wrr.lock.Unlock()
 	}
 }
+
+func BenchmarkWRRSelect(b *testing.B) {
+	h1 := "192.168.1.1"
+	h2 := "192.168.1.2"
+	h3 := "192.168.1.3"
+
+	wrr := NewWRR(
+		Backend{h1, 80, 5},
+		Backend{h2, 80, 1},
+		Backend{h3, 80, 1},
+	)
+
+	for i := 0; i < b.N; i++ {
+		wrr.Select()
+	}
+}

@@ -553,3 +553,16 @@ func TestRouterGenericURL(t *testing.T) {
 		t.Errorf("nothing should been found, but got: %+v, %s, %t", handler, url, tsr)
 	}
 }
+
+func BenchmarkRouterGenericURL(b *testing.B) {
+	r := NewRouter()
+	r.GET("/user/:name/hello", fakeProxyHandler)
+	r.GET("/user/:name/card/:number", fakeProxyHandler)
+	r.GET("/user/:name/pc/:count", fakeProxyHandler)
+	r.GET("/halo/that/hello", fakeProxyHandler)
+	r.GET("/src/*file", fakeProxyHandler)
+
+	for i := 0; i < b.N; i++ {
+		r.GenericURL("GET", "/user/jhon/card/1")
+	}
+}

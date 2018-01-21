@@ -29,8 +29,11 @@ func TestMain(t *testing.T) {
 		"application/json",
 		bytes.NewBuffer(jsonBytes),
 	)
-	if err != nil || resp.StatusCode != 200 {
-		t.Errorf("should return 200, but got: %s with code: %d", err, resp.StatusCode)
+	if err != nil {
+		t.Errorf("request error, got: %s", err)
+	}
+	if resp.StatusCode != 200 {
+		t.Errorf("should return 200, but got: %d", resp.StatusCode)
 	}
 	if len(breaker.balancers) == 0 || len(breaker.routers) == 0 || len(breaker.timelines) == 0 {
 		t.Errorf("breaker should been settled, but got: %+v", breaker)

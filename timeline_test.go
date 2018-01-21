@@ -78,3 +78,24 @@ func TestQueryStatusWithNilTail(t *testing.T) {
 
 	tl.QueryStatus(url)
 }
+
+func BenchmarkIncr(b *testing.B) {
+	tl := NewTimeline()
+
+	for i := 0; i < b.N; i++ {
+		tl.Incr("/user/:/hello", 200)
+	}
+}
+
+func BenchmarkQueryStatus(b *testing.B) {
+	tl := NewTimeline()
+
+	tl.Incr("/user/:/hello", 200)
+	tl.Incr("/user/:/hello", 429)
+	tl.Incr("/user/:/hello", 500)
+	tl.Incr("/user/:/hello", 502)
+
+	for i := 0; i < b.N; i++ {
+		tl.QueryStatus("/user/:/hello")
+	}
+}
