@@ -334,8 +334,10 @@ walk: // outer loop for walking the tree
 		if len(path) > len(n.path) {
 			if path[:len(n.path)] == n.path {
 				length := len(n.path)
-				copy(urlBytes[offset:], []byte(path[:length]))
-				offset += length
+				for i := 0; i < length; i++ {
+					urlBytes[offset] = path[i]
+					offset++
+				}
 
 				path = path[length:]
 				// If this node does not have a wildcard (param or catchAll)
@@ -396,9 +398,8 @@ walk: // outer loop for walking the tree
 
 				case catchAll:
 					urlBytes[offset] = '/'
-					offset++
-					urlBytes[offset] = '*'
-					offset++
+					urlBytes[offset+1] = '*'
+					offset += 2
 
 					handle = n.handle
 					return handle, string(urlBytes[:offset]), tsr
@@ -409,8 +410,10 @@ walk: // outer loop for walking the tree
 			}
 		} else if path == n.path {
 			length := len(n.path)
-			copy(urlBytes[offset:], []byte(path))
-			offset += length
+			for i := 0; i < length; i++ {
+				urlBytes[offset] = path[i]
+				offset++
+			}
 
 			// We should have reached the node containing the handle.
 			// Check if this node has a handle registered.
