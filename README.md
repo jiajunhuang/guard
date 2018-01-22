@@ -59,7 +59,7 @@ become better and better!
 - [x] radix tree(thanks @[httprouter](https://github.com/julienschmidt/httprouter))
 - [x] timeline buckets for statistics
 - [x] load balancer algorithm with weighted round robin
-- [ ] load balancer algorithm with round robin
+- [x] load balancer algorithm with round robin
 - [x] load balancer algorithm with random
 - [x] circuit breaker
 - [x] proxy server(thanks @[golang](https://golang.org/))
