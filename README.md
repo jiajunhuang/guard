@@ -10,6 +10,10 @@ guard is a generic high performance circuit breaker & proxy written in Go. It ha
 - load balancer: which distributes requests
 - circuit breaker: which make sure your backend services will not breakdown by a large quantity of requests
 
+## workflow
+
+![workflow diagram](./workflow.png)
+
 ## benchmark
 
 I've made a simple benchmark in my laptop(i5-3210M CPU @ 2.50GHz with 4 cores):
