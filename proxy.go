@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	transport = &http.Transport{
+	transport http.RoundTripper = &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
 			Timeout:   30 * time.Second,
@@ -28,7 +28,7 @@ var (
 )
 
 // Proxy use httputil.ReverseProxy
-func Proxy(balancer Balancer, w ResponseWriter, r *http.Request) {
+func Proxy(balancer Balancer, w http.ResponseWriter, r *http.Request) {
 	backend, found := balancer.Select()
 	if !found {
 		w.WriteHeader(http.StatusForbidden)
