@@ -80,22 +80,24 @@ func NewTimeline() *Timeline {
 // Incr increase by 1 on the given genericURL and status code, return value after incr
 func (t *Timeline) Incr(url string, code int) uint32 {
 	now := RightNow()
+	tail := t.tail
+
+	if tail == nil {
+		panic("timelist should always has at least one bucket, but now tail is pointer to nil")
+	}
 
 	// lock...
 	t.lock.Lock()
 
-	if t.tail == nil {
-		panic("timelist should always has at least one bucket, but now tail is pointer to nil")
-	}
-
-	if t.tail.key != now {
+	if tail.key != now {
 		b := NewBucket(now)
-		t.tail.next = b
+		tail.next = b
 		t.tail = b
+		tail = b
 	}
 
 	// check if head is outdated
-	oldest := RightNow() - bucketStep*maxBuckets
+	oldest := now - bucketStep*maxBuckets
 	for {
 		if t.head.key < oldest {
 			t.head = t.head.next
@@ -105,10 +107,10 @@ func (t *Timeline) Incr(url string, code int) uint32 {
 	}
 
 	var status *Status
-	status = t.tail.counter[url]
+	status = tail.counter[url]
 	if status == nil {
 		status = &Status{}
-		t.tail.counter[url] = status
+		tail.counter[url] = status
 	}
 
 	// defer is too slow
@@ -130,30 +132,33 @@ func (t *Timeline) Incr(url string, code int) uint32 {
 
 // QueryStatus return counts of status 200, 429, 500, 502, and failure ratio
 func (t *Timeline) QueryStatus(url string) (uint32, uint32, uint32, uint32, float64) {
-	t.lock.RLock()
-
-	if t.tail == nil {
+	tail := t.tail
+	if tail == nil {
 		panic("t.tail should never be nil")
 	}
 
-	tail := t.tail
-
 	var status *Status
+
+	// lock
+	t.lock.RLock()
+
 	status = tail.counter[url]
 	if status == nil {
-		status = &Status{}
-		t.tail.counter[url] = status
+		// it will be created while execute Incr
+		t.lock.RUnlock()
+		return 0, 0, 0, 0, 0.0
 	}
 
 	ok, too, internal, bad := status.OK, status.TooManyRequests, status.InternalError, status.BadGateway
+
+	// defer is too slow
+	t.lock.RUnlock()
+
 	ratio := float64(
 		too+internal+bad,
 	) / float64(
 		1+ok+too+internal+bad,
 	)
-
-	// defer is too slow
-	t.lock.RUnlock()
 
 	return ok, too, internal, bad, ratio
 }
