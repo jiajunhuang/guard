@@ -37,14 +37,6 @@ func RightNow() int64 {
 	return ts - ts%bucketStep
 }
 
-// Status is an collection of status: 200, 429, 500, 502
-type Status struct {
-	OK              uint32 `json:"ok"`
-	TooManyRequests uint32 `json:"too_many_requests"`
-	InternalError   uint32 `json:"internal_error"`
-	BadGateway      uint32 `json:"bad_gateway"`
-}
-
 // Counter counts value of key
 type Counter map[string]*Status
 

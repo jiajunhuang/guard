@@ -10,13 +10,6 @@ import (
 	"unicode/utf8"
 )
 
-func min(a, b int) int {
-	if a <= b {
-		return a
-	}
-	return b
-}
-
 func countParams(path string) uint8 {
 	var n uint
 	for i := 0; i < len(path); i++ {
