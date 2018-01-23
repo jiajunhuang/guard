@@ -18,5 +18,9 @@ workflow:
 */
 
 func main() {
+	n := &node{}
+	n.insertChild("/user/*card", "/user/*card", GET)
 
+	n = n.children[0]
+	n.insertChild("/*card", "/*card", GET)
 }

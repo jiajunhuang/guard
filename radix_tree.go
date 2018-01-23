@@ -90,6 +90,10 @@ func (n *node) setMethods(methods ...HTTPMethod) {
 	}
 }
 
+func (n *node) hasMethod(method HTTPMethod) bool {
+	return method == (method & n.methods)
+}
+
 // addRoute adds a node with given path, handle all the resource with it.
 // if it's a leaf, it should have a ring of `Status`.
 func (n *node) addRoute(path string, methods ...HTTPMethod) {
@@ -206,21 +210,21 @@ func (n *node) insertChild(path string, fullPath string, methods ...HTTPMethod) 
 		}
 	}
 
+	var i = 0
+	var c byte
 	for ; numParams > 0; numParams-- {
 		// first step, find the first wildcard(beginning with ':' or '*') of the current path
-		var i int
-		var c byte
-		for i = 0; i < len(path); i++ {
+		for i = offset; i < len(path); i++ {
 			c = path[i]
-			if c != ':' && c != '*' {
-				continue
+			if c == ':' || c == '*' {
+				break
 			}
 		}
 
 		// second step, find wildcard name, wildcard name cannot contain ':' and '*'
 		// stops when meet '/' or the end
 		end := i + 1
-		for end < len(path) && path[end] != '/' {
+		for end < maxLen && path[end] != '/' {
 			switch path[end] {
 			case ':', '*':
 				log.Panicf("wildcards ':' or '*' are not allowed in param names: %s in %s", path, fullPath)
@@ -261,30 +265,22 @@ func (n *node) insertChild(path string, fullPath string, methods ...HTTPMethod) 
 				n.children = []*node{child}
 				n = child
 			}
-			// continue loop...
 		} else { //catchAll
 			if end != maxLen || numParams > 1 {
 				log.Panicf("catchAll routers are only allowed once at the end of the path: %s", fullPath)
 			}
 
-			if len(n.path) > 0 && n.path[len(n.path)-1] == '/' {
-				log.Panicf("catchAll conflict with existing node in the path %s", fullPath)
-			}
-
-			i--
-			if path[i] != '/' {
+			if path[i-1] != '/' {
 				log.Panicf("no / before catchAll in path %s", fullPath)
 			}
+
+			// this node holding path 'xxx/'
 			n.path = path[offset:i]
+			n.wildChild = true
 
-			// first node, '/'
-			child := &node{wildChild: true, nType: catchAll}
-			n.children = []*node{child}
-			n.indices = string(path[i])
-			n = child
-
-			// second child, node holding the variable, '*xxxx'
-			child = &node{path: path[i:], nType: catchAll}
+			// child node holding the variable, '*xxxx'
+			child := &node{path: path[i:], nType: catchAll, leaf: true, status: StatusRing()}
+			child.setMethods(methods...)
 			n.children = []*node{child}
 
 			// all done
