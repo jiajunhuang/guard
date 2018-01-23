@@ -208,3 +208,113 @@ func TestInsertCatchAllNoSlash(t *testing.T) {
 	n := &node{}
 	n.insertChild("/user*name", "/user*name")
 }
+
+func TestAddRoute(t *testing.T) {
+	n := &node{}
+
+	n.AddRoute("/user/hello", GET, POST)
+	checkNodeValid(
+		t, n,
+		nodeExpceted{"/user/hello", root, GET | POST, false, true, 0, true, false},
+	)
+
+	n.AddRoute("/user/world", DELETE)
+	checkNodeValid(
+		t, n,
+		nodeExpceted{"/user/", root, NONE, false, false, 2, false, true},
+	)
+
+	hello := n.children[0]
+	world := n.children[1]
+	if hello.path == "world" {
+		hello, world = world, hello
+	}
+
+	checkNodeValid(
+		t, hello,
+		nodeExpceted{"hello", static, GET | POST, false, true, 0, true, false},
+	)
+	checkNodeValid(
+		t, world,
+		nodeExpceted{"world", static, DELETE, false, true, 0, true, false},
+	)
+}
+
+func TestAddRouteWildChild(t *testing.T) {
+	n := &node{}
+
+	n.AddRoute("/user/:name/hello", GET)
+	checkNodeValid(
+		t, n,
+		nodeExpceted{"/user/", root, NONE, true, true, 1, false, true},
+	)
+
+	name := n.children[0]
+	checkNodeValid(
+		t, name,
+		nodeExpceted{":name", param, NONE, false, true, 1, false, true},
+	)
+
+	hello := name.children[0]
+	checkNodeValid(
+		t, hello,
+		nodeExpceted{"/hello", static, GET, false, true, 0, true, false},
+	)
+}
+
+func TestAddRouteDualWildChild(t *testing.T) {
+	n := &node{}
+
+	n.AddRoute("/user/:name/hello", GET)
+	checkNodeValid(
+		t, n,
+		nodeExpceted{"/user/", root, NONE, true, true, 1, false, true},
+	)
+
+	n.AddRoute("/user/:name/hello/:card", GET)
+	checkNodeValid(
+		t, n,
+		nodeExpceted{"/user/", root, NONE, true, true, 1, false, true},
+	)
+
+	name := n.children[0]
+	checkNodeValid(
+		t, name,
+		nodeExpceted{":name", param, NONE, false, true, 1, false, true},
+	)
+
+	slashHello := name.children[0]
+	checkNodeValid(
+		t, slashHello,
+		nodeExpceted{"/hello", static, GET, false, false, 1, true, false},
+	)
+
+	slash := slashHello.children[0]
+	checkNodeValid(
+		t, slash,
+		nodeExpceted{"/", static, NONE, true, true, 1, false, true},
+	)
+
+	card := slash.children[0]
+	checkNodeValid(
+		t, card,
+		nodeExpceted{":card", param, GET, false, true, 0, true, false},
+	)
+}
+
+func TestAddRouteWildParamConflict(t *testing.T) {
+	defer shouldPanic()
+
+	n := &node{}
+	n.AddRoute("/user/:name/hello/world")
+	n.AddRoute("/user/*whoever")
+}
+
+func TestAddRouteMultiIndices(t *testing.T) {
+	n := &node{}
+	n.AddRoute("/user/:name/hello/world")
+	n.AddRoute("/use/this")
+	n.AddRoute("/usea/this")
+	n.AddRoute("/useb/that")
+	n.AddRoute("/usea/that")
+}

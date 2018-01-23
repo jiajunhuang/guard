@@ -19,8 +19,10 @@ workflow:
 
 func main() {
 	n := &node{}
-	n.insertChild("/user/*card", "/user/*card", GET)
 
-	n = n.children[0]
-	n.insertChild("/*card", "/*card", GET)
+	n.AddRoute("/user/:name/hello/world")
+	n.AddRoute("/use/this")
+	n.AddRoute("/usea/this")
+	n.AddRoute("/usea/that")
+	n.AddRoute("/useb/that")
 }

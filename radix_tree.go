@@ -94,9 +94,9 @@ func (n *node) hasMethod(method HTTPMethod) bool {
 	return method == (method & n.methods)
 }
 
-// addRoute adds a node with given path, handle all the resource with it.
+// AddRoute adds a node with given path, handle all the resource with it.
 // if it's a leaf, it should have a ring of `Status`.
-func (n *node) addRoute(path string, methods ...HTTPMethod) {
+func (n *node) AddRoute(path string, methods ...HTTPMethod) {
 	fullPath := path
 
 	/* tree is empty */
@@ -136,12 +136,12 @@ walk:
 				status:    n.status,
 			}
 
-			n.path = path[:i]
 			n.methods = NONE
 			n.leaf = false
 			n.status = nil
 			n.children = []*node{&child}
 			n.indices = string([]byte{n.path[i]})
+			n.path = path[:i]
 			n.wildChild = false
 		}
 
@@ -162,12 +162,14 @@ walk:
 			// only thses two cases are permit, panic if not
 			lenNode := len(n.path)
 			lenPath := len(path)
-			if !((n.path == path) || (lenNode == lenPath-1 && n.path == path[:lenNode])) {
+			if lenPath >= lenNode && n.path == path[:lenNode] &&
+				// Check for longer wildcard, e.g. :name and :names
+				(lenNode >= lenPath || path[lenNode] == '/') {
+				continue walk
+			} else {
 				log.Panicf("%s in %s conflict with node %s", path, fullPath, n.path)
-			}
 
-			// everything works fine
-			continue walk
+			}
 		}
 
 		c := path[0]
