@@ -32,24 +32,13 @@ import (
 // each time there is a request, we try to find find it through the radix tree,
 // and then calculate the ratio, decide step down or not.
 
-// Status is for counting http status code, it's a ring.
-// uint32 can be at most 4294967296, it's enough for proxy server, because this
-// means in the past second, you've received 4294967296 requests, 429496729/second.
-type Status struct {
-	prev            *Status
-	next            *Status
-	OK              uint32
-	TooManyRequests uint32
-	InternalError   uint32
-	BadGateway      uint32
-}
+// ring of Status is for counting http status code.
 
 type nodeType uint8
 
 const (
 	static   nodeType = iota // default, static string
 	root                     // root node
-	leaf                     // it's a leaf
 	param                    // like `:name` in `/user/:name/hello`
 	catchAll                 // like `*filepath` in `/share/*filepath`
 )
@@ -59,7 +48,8 @@ type HTTPMethod uint16
 
 // HTTP Methods: https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods
 const (
-	GET HTTPMethod = 1 << iota
+	NONE HTTPMethod = 0 // means no method had set
+	GET  HTTPMethod = 1 << iota
 	POST
 	PUT
 	DELETE
@@ -77,10 +67,11 @@ type node struct {
 	nType nodeType // node type, static, root, param, or catchAll
 	// supported HTTP methods, for decide raise a `405 Method Not Allowd` or not,
 	// if a method is support, the correspoding bit is set
-	methods   uint16
+	methods   HTTPMethod
 	wildChild bool    // child type is param, or catchAll
 	indices   string  // first letter of childs, it's index for binary search.
 	children  []*node // childrens
+	leaf      bool    // if it's a leaf
 	status    *Status // if it's a leaf, it should have a ring of `Status` struct
 }
 
@@ -92,19 +83,32 @@ func min(a, b int) int {
 	return b
 }
 
+func (n *node) setMethods(methods ...HTTPMethod) {
+	for _, method := range methods {
+		// set corresponding bit
+		n.methods |= method
+	}
+}
+
 // addRoute adds a node with given path, handle all the resource with it.
 // if it's a leaf, it should have a ring of `Status`.
-func (n *node) addRoute(path string) {
+func (n *node) addRoute(path string, methods ...HTTPMethod) {
+	fullPath := path
+
 	/* tree is empty */
 	if n.path == "" && len(n.children) == 0 {
 		n.nType = root
-		n.insertChild(path)
+		// reset these properties
+		n.leaf = false
+		n.methods = NONE
+		n.status = nil
+
+		// insert
+		n.insertChild(path, fullPath, methods...)
 		return
 	}
 
 	/* tree is not empty */
-
-	fullPath := path
 walk:
 	for {
 		maxLen := min(len(path), len(n.path))
@@ -118,18 +122,22 @@ walk:
 		// if max common prefix is shorter than n.path, split n
 		if i < len(n.path) {
 			child := node{
-				path:  n.path[i:],
-				nType: static,
-				// methods
+				path:      n.path[i:],
+				nType:     static,
+				methods:   n.methods,
 				wildChild: n.wildChild,
 				indices:   n.indices,
 				children:  n.children,
-				// status
+				leaf:      n.leaf,
+				status:    n.status,
 			}
 
+			n.path = path[:i]
+			n.methods = NONE
+			n.leaf = false
+			n.status = nil
 			n.children = []*node{&child}
 			n.indices = string([]byte{n.path[i]})
-			n.path = path[:i]
 			n.wildChild = false
 		}
 
@@ -183,15 +191,115 @@ walk:
 			n.children = append(n.children, child)
 			n = child
 		}
-		n.insertChild(path)
+		n.insertChild(path, fullPath, methods...)
 	}
 }
 
-func (n *node) insertChild(path string) {
-	panic("not implemented")
+func (n *node) insertChild(path string, fullPath string, methods ...HTTPMethod) {
+	var offset int // bytes in the path have already handled
+	var numParams uint8
+	var maxLen = len(path)
+
+	for i := 0; i < len(path); i++ {
+		if path[i] == ':' || path[i] == '*' {
+			numParams++
+		}
+	}
+
+	for ; numParams > 0; numParams-- {
+		// first step, find the first wildcard(beginning with ':' or '*') of the current path
+		var i int
+		var c byte
+		for i = 0; i < len(path); i++ {
+			c = path[i]
+			if c != ':' && c != '*' {
+				continue
+			}
+		}
+
+		// second step, find wildcard name, wildcard name cannot contain ':' and '*'
+		// stops when meet '/' or the end
+		end := i + 1
+		for end < len(path) && path[end] != '/' {
+			switch path[end] {
+			case ':', '*':
+				log.Panicf("wildcards ':' or '*' are not allowed in param names: %s in %s", path, fullPath)
+			default:
+				end++
+			}
+		}
+
+		// node whose type is param or catchAll are conflict, check it
+		if len(n.children) > 0 {
+			log.Panicf("wildcard route %s conflict with existing children in path %s", path[i:end], fullPath)
+		}
+
+		// check if the wildcard has a name
+		if end-i < 2 {
+			log.Panicf("wildcards must be named with a non-empty name in path %s", fullPath)
+		}
+
+		if c == ':' { // param
+			// split path at the beginning of the wildcard
+			if i > 0 {
+				n.path = path[offset:i]
+				offset = i
+			}
+
+			child := &node{nType: param}
+			n.children = []*node{child}
+			n.wildChild = true
+			n = child
+
+			// if the path doesn't end with the wildcard, then there will be another non-wildcard subpath
+			// starting with '/'
+			if end < maxLen {
+				n.path = path[offset:end]
+				offset = end
+
+				child := &node{}
+				n.children = []*node{child}
+				n = child
+			}
+			// continue loop...
+		} else { //catchAll
+			if end != maxLen || numParams > 1 {
+				log.Panicf("catchAll routers are only allowed once at the end of the path: %s", fullPath)
+			}
+
+			if len(n.path) > 0 && n.path[len(n.path)-1] == '/' {
+				log.Panicf("catchAll conflict with existing node in the path %s", fullPath)
+			}
+
+			i--
+			if path[i] != '/' {
+				log.Panicf("no / before catchAll in path %s", fullPath)
+			}
+			n.path = path[offset:i]
+
+			// first node, '/'
+			child := &node{wildChild: true, nType: catchAll}
+			n.children = []*node{child}
+			n.indices = string(path[i])
+			n = child
+
+			// second child, node holding the variable, '*xxxx'
+			child = &node{path: path[i:], nType: catchAll}
+			n.children = []*node{child}
+
+			// all done
+			return
+		}
+	}
+
+	// insert the remaining part of path
+	n.path = path[offset:]
+	n.setMethods(methods...)
+	n.leaf = true
+	n.status = StatusRing()
 }
 
 // byPath return a node with the given path
-func (n *node) byPath(path string) (nd *node, tsr bool, found bool) {
-	return nil, false, false
+func (n *node) byPath(path string) (nd *node, found bool) {
+	return nil, false
 }
