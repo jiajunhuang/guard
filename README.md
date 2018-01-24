@@ -65,7 +65,7 @@ become better and better!
 - [x] proxy server(thanks @[golang](https://golang.org/))
 - [ ] dynamic configuration load & save
 - [ ] graceful restart
-- [ ] URL-level mutex(remove the bucket-level mutex to gain a better performance)
+- [x] ~~URL-level mutex(remove the bucket-level mutex to gain a better performance)~~ the statistics module is lock-free now
 - [ ] fallback option while circuit breaker works(maybe serve a static html page, or return some words.)
 - [ ] more test cases & benchmarks
 
