@@ -85,6 +85,10 @@ func BenchmarkProxy(b *testing.B) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/", nil)
 
+	fakeBackend.Host = "127.0.0.1"
+	fakeBackend.Port = 10989
+	fakeBackend.Weight = 1
+
 	for i := 0; i < b.N; i++ {
 		Proxy(balancer, w, r)
 	}
