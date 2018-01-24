@@ -1,5 +1,11 @@
 package main
 
+import (
+	"log"
+	"net/http"
+	"sync/atomic"
+)
+
 const (
 	statusStep   = 10
 	maxStatusLen = 12
@@ -32,4 +38,43 @@ func StatusRing() *Status {
 	cursor.next = head
 
 	return head
+}
+
+// incr increase by 1 on the given genericURL and status code, return value after incr
+func (n *node) incr(code int) uint32 {
+	if n.status == nil {
+		log.Panicf("status of node %+v is nil", n)
+	}
+
+	status := n.status
+	switch code {
+	case http.StatusOK:
+		return atomic.AddUint32(&status.OK, 1)
+	case http.StatusTooManyRequests:
+		return atomic.AddUint32(&status.TooManyRequests, 1)
+	case http.StatusInternalServerError:
+		return atomic.AddUint32(&status.InternalError, 1)
+	case http.StatusBadGateway:
+		return atomic.AddUint32(&status.BadGateway, 1)
+	default:
+		log.Panicf("bad status code %d", code)
+		return 0 // just for go lint, code here should never been execute
+	}
+}
+
+func (n *node) query() (uint32, uint32, uint32, uint32, float64) {
+	if n.status == nil {
+		log.Panicf("status of node %+v is nil", n)
+	}
+
+	status := n.status
+	ok, too, internal, bad := status.OK, status.TooManyRequests, status.InternalError, status.BadGateway
+
+	ratio := float64(
+		too+internal+bad,
+	) / float64(
+		1+ok+too+internal+bad,
+	)
+
+	return ok, too, internal, bad, ratio
 }
