@@ -428,3 +428,40 @@ func TestByPathBadNode(t *testing.T) {
 
 	n.byPath("/user/jhon")
 }
+
+// benchmark
+func BenchmarkByPath(b *testing.B) {
+	n := &node{}
+	n.addRoute("/user/hello/world/this/is/so/long")
+
+	for i := 0; i < b.N; i++ {
+		n.byPath("/user/hello/world/this/is/so/long")
+	}
+}
+
+func BenchmarkByPathNotFound(b *testing.B) {
+	n := &node{}
+	n.addRoute("/user/hello/world/this/is/so/long")
+
+	for i := 0; i < b.N; i++ {
+		n.byPath("/user/")
+	}
+}
+
+func BenchmarkByPathParam(b *testing.B) {
+	n := &node{}
+	n.addRoute("/user/hello/:world/this/is/so/long")
+
+	for i := 0; i < b.N; i++ {
+		n.byPath("/user/hello/world/this/is/so/long")
+	}
+}
+
+func BenchmarkByPathCatchall(b *testing.B) {
+	n := &node{}
+	n.addRoute("/user/hello/*world")
+
+	for i := 0; i < b.N; i++ {
+		n.byPath("/user/hello/world/this/is/so/long")
+	}
+}
