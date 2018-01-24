@@ -147,6 +147,7 @@ walk:
 
 		// path is shorter or equal than n.path, so quit
 		if i == len(path) {
+			n.setMethods(methods...)
 			return
 		}
 

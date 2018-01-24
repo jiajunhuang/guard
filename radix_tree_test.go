@@ -318,3 +318,19 @@ func TestAddRouteMultiIndices(t *testing.T) {
 	n.AddRoute("/useb/that")
 	n.AddRoute("/usea/that")
 }
+
+func TestAddRouteSamePath(t *testing.T) {
+	n := &node{}
+
+	n.AddRoute("/user/hello", GET, POST)
+	checkNodeValid(
+		t, n,
+		nodeExpceted{"/user/hello", root, GET | POST, false, true, 0, true, false},
+	)
+
+	n.AddRoute("/user/hello", DELETE)
+	checkNodeValid(
+		t, n,
+		nodeExpceted{"/user/hello", root, GET | POST | DELETE, false, true, 0, true, false},
+	)
+}
