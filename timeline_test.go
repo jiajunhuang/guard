@@ -35,15 +35,6 @@ func TestBadIncrStatusIsNil(t *testing.T) {
 	n.incr(http.StatusOK)
 }
 
-func TestIncrBadStatus(t *testing.T) {
-	defer shouldPanic()
-
-	n := &node{}
-	n.addRoute("/user/hello")
-
-	n.incr(http.StatusBadRequest)
-}
-
 func TestQuery(t *testing.T) {
 	n := &node{}
 	n.addRoute("/user")
@@ -152,5 +143,11 @@ func BenchmarkQuery(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		n.query()
+	}
+}
+
+func BenchmarkRightNow(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		RightNow()
 	}
 }

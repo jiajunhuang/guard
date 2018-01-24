@@ -19,8 +19,7 @@ func NewApp(b Balancer, tsr bool) *Application {
 	return &Application{tsr, b, &node{}}
 }
 
-// AddRoute add a route to itself
-func (a *Application) AddRoute(path string, methods ...string) {
+func convertMethod(methods ...string) HTTPMethod {
 	httpMethods := NONE
 
 	if len(methods) == 0 {
@@ -51,6 +50,13 @@ func (a *Application) AddRoute(path string, methods ...string) {
 			log.Panicf("bad http method: %s", m)
 		}
 	}
+
+	return httpMethods
+}
+
+// AddRoute add a route to itself
+func (a *Application) AddRoute(path string, methods ...string) {
+	a.root.addRoute(path, convertMethod(methods...))
 }
 
 func (a *Application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -87,14 +93,10 @@ func (a *Application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// node is leaf?
-	if !n.isLeaf {
-		log.Panicf("node find by %s is not a leaf!", path)
-	}
-
-	// status is nil?
-	if n.status == nil {
-		log.Panicf("status of node find by %s is nil!", path)
+	// method allowed?
+	if !n.hasMethod(convertMethod(r.Method)) {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
 	}
 
 	// circuit breaker is open?

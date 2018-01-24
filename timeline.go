@@ -87,7 +87,7 @@ func (n *node) incr(code int) uint32 {
 	case http.StatusBadGateway:
 		return atomic.AddUint32(&status.BadGateway, 1)
 	default:
-		log.Panicf("bad status code %d", code)
+		log.Printf("ignore status code %d", code)
 		return 0 // just for go lint, code here should never been execute
 	}
 }

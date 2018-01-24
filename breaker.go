@@ -11,7 +11,7 @@ import (
 
 // Breaker is circuit breaker, it's a collection of Application
 type Breaker struct {
-	balancers map[string]*Application
+	apps map[string]*Application
 }
 
 // NewBreaker return a brand new circuit breaker, with nothing in mapper
@@ -22,5 +22,14 @@ func NewBreaker() *Breaker {
 }
 
 func (b *Breaker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	panic("not implemented")
+	appName := r.Host
+	var app *Application
+	var exist bool
+	if app, exist = b.apps[appName]; !exist {
+		w.Write([]byte("app " + appName + " not exist"))
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	app.ServeHTTP(w, r)
 }

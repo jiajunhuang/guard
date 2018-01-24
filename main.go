@@ -20,8 +20,7 @@ workflow:
 func main() {
 	n := &node{}
 
-	n.addRoute("/user/:name/hello", GET, DELETE)
-	n.addRoute("/use/:this/that", GET, DELETE)
+	n.addRoute("/user/jhon", GET, DELETE)
 
 	n.byPath("/user/jhon")
 }
