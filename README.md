@@ -19,40 +19,61 @@ guard is a generic high performance circuit breaker & proxy written in Go. It ha
 I've made a simple benchmark in my laptop(i5-3210M CPU @ 2.50GHz with 4 cores):
 
 ```bash
-jiajun@idea ~: wrk --latency -H "Host: www.example.com" -c 1024 -d 30 -t 2 http://127.0.0.1:9999  # nginx
-Running 30s test @ http://127.0.0.1:9999
-  2 threads and 1024 connections
-  Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency   110.66ms  167.36ms   1.19s    94.54%
-    Req/Sec     6.59k     1.02k    9.21k    62.71%
-  Latency Distribution
-     50%   78.99ms
-     75%  153.75ms
-     90%  177.76ms
-     99%  986.89ms
-  392348 requests in 30.06s, 318.03MB read
-  Socket errors: connect 5, read 0, write 0, timeout 0
-Requests/sec:  13053.00
-Transfer/sec:     10.58MB
-jiajun@idea ~: wrk --latency -H "Host: www.example.com" -c 1024 -d 30 -t 2 http://127.0.0.1:23456  # guard
+$ wrk --latency -H "Host: www.example.com" -c 2048 -d 30 -t 2 http://127.0.0.1:23456
 Running 30s test @ http://127.0.0.1:23456
-  2 threads and 1024 connections
+  2 threads and 2048 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency   142.97ms   45.58ms 390.70ms   73.94%
-    Req/Sec     3.57k   559.23     4.80k    70.23%
+    Latency   129.72ms   47.00ms 357.08ms   73.62%
+    Req/Sec     3.73k   573.26     5.10k    73.75%
   Latency Distribution
-     50%  154.74ms
-     75%  170.04ms
-     90%  183.32ms
-     99%  242.98ms
-  212676 requests in 30.04s, 163.48MB read
-  Socket errors: connect 5, read 0, write 0, timeout 0
-Requests/sec:   7080.37
-Transfer/sec:      5.44MB
+     50%  145.10ms
+     75%  162.08ms
+     90%  173.55ms
+     99%  234.31ms
+  221712 requests in 30.03s, 170.42MB read
+  Socket errors: connect 1029, read 0, write 0, timeout 0
+Requests/sec:   7382.58
+Transfer/sec:      5.67MB
+$ wrk --latency -H "Host: www.example.com" -c 2048 -d 30 -t 2 http://127.0.0.1:9999
+Running 30s test @ http://127.0.0.1:9999
+  2 threads and 2048 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    98.71ms  160.47ms   1.19s    95.27%
+    Req/Sec     6.68k     1.34k    9.53k    55.20%
+  Latency Distribution
+     50%   52.35ms
+     75%  139.05ms
+     90%  183.88ms
+     99%  965.43ms
+  396909 requests in 30.05s, 321.73MB read
+  Socket errors: connect 1029, read 0, write 0, timeout 13
+Requests/sec:  13208.58
+Transfer/sec:     10.71MB
 ```
 
-for now, guard's proxy performance is about 54% of Nginx, but I'm stilling work on it! don't worry, it will
+for now, guard's proxy performance is about 55% of Nginx, but I'm stilling work on it! don't worry, it will
 become better and better!
+
+by the way, thanks the [suggestion](https://github.com/jiajunhuang/guard/issues/15) from [@dongzerun](https://github.com/dongzerun),
+by configure the `GOGC` in environment, guard's proxy performance is about 70% of Nginx.
+
+```bash
+$ wrk --latency -H "Host: www.example.com" -c 2048 -d 30 -t 2 http://127.0.0.1:23456  # guard, by setting environment variable `GOGC=1024`
+Running 30s test @ http://127.0.0.1:23456
+  2 threads and 2048 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency   106.76ms   37.07ms 355.80ms   72.19%
+    Req/Sec     4.70k   806.66     6.26k    63.93%
+  Latency Distribution
+     50%  117.45ms
+     75%  128.71ms
+     90%  141.26ms
+     99%  187.43ms
+  278789 requests in 30.03s, 214.29MB read
+  Socket errors: connect 1029, read 0, write 0, timeout 0
+Requests/sec:   9283.34
+Transfer/sec:      7.14MB
+```
 
 ## TODO
 
