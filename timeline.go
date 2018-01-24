@@ -4,12 +4,20 @@ import (
 	"log"
 	"net/http"
 	"sync/atomic"
+	"time"
+	"unsafe"
 )
 
 const (
-	statusStep   = 10
-	maxStatusLen = 12
+	statusStep   int64 = 10
+	maxStatusLen       = 12
 )
+
+// RightNow return status key
+func RightNow() int64 {
+	t := time.Now().Unix()
+	return t - t%statusStep
+}
 
 // Status is for counting http status code
 // uint32 can be at most 4294967296, it's enough for proxy server, because this
@@ -17,6 +25,7 @@ const (
 type Status struct {
 	prev            *Status
 	next            *Status
+	key             int64 // for now, key is time
 	OK              uint32
 	TooManyRequests uint32
 	InternalError   uint32
@@ -40,13 +49,34 @@ func StatusRing() *Status {
 	return head
 }
 
+// refreshStatus refresh the current status if it's outdate, and return the latest one
+func (n *node) refreshStatus(now int64) *Status {
+	status := n.status
+	if status.key != now {
+		if atomic.CompareAndSwapPointer(
+			// first, get address of n.status, means, address of `status field in n`, get it's address,
+			// cast it to `*unsafe.Pointer`
+			(*unsafe.Pointer)(unsafe.Pointer(&(n.status))), unsafe.Pointer(status), unsafe.Pointer(status.next),
+		) {
+			// clean old data, though it may cause some dirty reads
+			atomic.StoreInt64(&n.status.key, now)
+			atomic.StoreUint32(&n.status.OK, 0)
+			atomic.StoreUint32(&n.status.TooManyRequests, 0)
+			atomic.StoreUint32(&n.status.InternalError, 0)
+			atomic.StoreUint32(&n.status.BadGateway, 0)
+		}
+	}
+
+	return n.status
+}
+
 // incr increase by 1 on the given genericURL and status code, return value after incr
 func (n *node) incr(code int) uint32 {
 	if n.status == nil {
 		log.Panicf("status of node %+v is nil", n)
 	}
 
-	status := n.status
+	status := n.refreshStatus(RightNow())
 	switch code {
 	case http.StatusOK:
 		return atomic.AddUint32(&status.OK, 1)
@@ -67,7 +97,7 @@ func (n *node) query() (uint32, uint32, uint32, uint32, float64) {
 		log.Panicf("status of node %+v is nil", n)
 	}
 
-	status := n.status
+	status := n.refreshStatus(RightNow())
 	ok, too, internal, bad := status.OK, status.TooManyRequests, status.InternalError, status.BadGateway
 
 	ratio := float64(

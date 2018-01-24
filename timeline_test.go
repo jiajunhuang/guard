@@ -97,6 +97,41 @@ func TestQueryNilStatus(t *testing.T) {
 	n.query()
 }
 
+func TestRefreshStatus(t *testing.T) {
+	n := &node{}
+	n.addRoute("/user/hello", GET)
+
+	status := n.status
+	now := RightNow()
+	n.status.key = now - 3*statusStep
+
+	n.refreshStatus(now)
+	if n.status == status {
+		t.Errorf("n.status should refresh to %d, but it's %+v", now, n.status)
+	}
+
+	status = n.status
+	if status.key != now {
+		t.Errorf("brand new status's key should be %d, but status is: %+v, status.prev is: %+v, status.next is: %+v", now, status, status.prev, status.next)
+	}
+	if status.OK != 0 || status.TooManyRequests != 0 || status.InternalError != 0 || status.BadGateway != 0 {
+		t.Errorf("brand new status's property should be reset, but it not: %+v", status)
+	}
+}
+
+func TestRefreshStatusShouldNotRefresh(t *testing.T) {
+	n := &node{}
+	n.addRoute("/user/hello", GET)
+
+	now := RightNow()
+	status := n.status
+	status.key = now
+	n.refreshStatus(now)
+	if n.status != status {
+		t.Errorf("n.status should not be refreshed, should be %p, but n is: %+v", status, n)
+	}
+}
+
 // benchmark
 func BenchmarkIncr(b *testing.B) {
 	n := &node{}
