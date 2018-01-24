@@ -71,7 +71,7 @@ type node struct {
 	wildChild bool    // child type is param, or catchAll
 	indices   string  // first letter of childs, it's index for binary search.
 	children  []*node // childrens
-	leaf      bool    // if it's a leaf
+	isLeaf    bool    // if it's a leaf
 	status    *Status // if it's a leaf, it should have a ring of `Status` struct
 }
 
@@ -94,16 +94,16 @@ func (n *node) hasMethod(method HTTPMethod) bool {
 	return method == (method & n.methods)
 }
 
-// AddRoute adds a node with given path, handle all the resource with it.
+// addRoute adds a node with given path, handle all the resource with it.
 // if it's a leaf, it should have a ring of `Status`.
-func (n *node) AddRoute(path string, methods ...HTTPMethod) {
+func (n *node) addRoute(path string, methods ...HTTPMethod) {
 	fullPath := path
 
 	/* tree is empty */
 	if n.path == "" && len(n.children) == 0 {
 		n.nType = root
 		// reset these properties
-		n.leaf = false
+		n.isLeaf = false
 		n.methods = NONE
 		n.status = nil
 
@@ -132,12 +132,12 @@ walk:
 				wildChild: n.wildChild,
 				indices:   n.indices,
 				children:  n.children,
-				leaf:      n.leaf,
+				isLeaf:    n.isLeaf,
 				status:    n.status,
 			}
 
 			n.methods = NONE
-			n.leaf = false
+			n.isLeaf = false
 			n.status = nil
 			n.children = []*node{&child}
 			n.indices = string([]byte{n.path[i]})
@@ -282,7 +282,7 @@ func (n *node) insertChild(path string, fullPath string, methods ...HTTPMethod) 
 			n.wildChild = true
 
 			// child node holding the variable, '*xxxx'
-			child := &node{path: path[i:], nType: catchAll, leaf: true, status: StatusRing()}
+			child := &node{path: path[i:], nType: catchAll, isLeaf: true, status: StatusRing()}
 			child.setMethods(methods...)
 			n.children = []*node{child}
 
@@ -294,11 +294,97 @@ func (n *node) insertChild(path string, fullPath string, methods ...HTTPMethod) 
 	// insert the remaining part of path
 	n.path = path[offset:]
 	n.setMethods(methods...)
-	n.leaf = true
+	n.isLeaf = true
 	n.status = StatusRing()
 }
 
 // byPath return a node with the given path
-func (n *node) byPath(path string) (nd *node, found bool) {
-	return nil, false
+func (n *node) byPath(path string) (nd *node, tsr bool, found bool) {
+walk:
+	for {
+		if len(path) > len(n.path) {
+			if path[:len(n.path)] == n.path {
+				path = path[len(n.path):]
+				// if this node does not have a wildcard(param or catchAll) child, we can just look up
+				// the next child node and continue to walk down the tree
+				if !n.wildChild {
+					c := path[0]
+
+					for i := 0; i < len(n.indices); i++ {
+						if c == n.indices[i] {
+							n = n.children[i]
+							continue walk
+						}
+					}
+
+					// nothing found
+					// we can recommend to redirect to the same URL without a trailing slash if a leaf
+					// exists for that path
+					tsr = (path == "/" && n.isLeaf)
+					return nil, tsr, false
+				}
+
+				// handle wildcard child
+				n = n.children[0]
+				switch n.nType {
+				case param:
+					end := 0
+					for end < len(path) && path[end] != '/' {
+						end++
+					}
+
+					// we need to go deeper, because we've not visit all bytes in path
+					if end < len(path) {
+						if len(n.children) > 0 {
+							path = path[end:]
+							n = n.children[0]
+							continue walk
+						}
+
+						// oh, no, we can't go deeper
+						// if URL is `/user/:name/`, redirect it to `/user/:name`
+						tsr = (len(path) == end+1 && path[len(path)-1] == '/')
+						return nil, tsr, false
+					}
+
+					// else, n is the node we want if it's a leaf
+					if n.isLeaf {
+						return n, false, true
+					}
+
+					tsr = len(n.children) == 1 && n.children[0].isLeaf && n.children[0].path == "/"
+					return nil, tsr, false
+				case catchAll:
+					return n, false, true
+				default:
+					log.Panicf("invalid node type: %+v", n)
+				}
+			}
+		} else if path == n.path {
+			if n.isLeaf {
+				return n, false, true
+			}
+
+			// it seems that the case in below(comment) will never hapeen...
+			//if path == "/" && n.wildChild && n.nType != root {
+			//return nil, true, false
+			//}
+
+			// nothing found, check if a child with this path + a trailing slash exists
+			for i := 0; i < len(n.indices); i++ {
+				if n.indices[i] == '/' {
+					n = n.children[i]
+					tsr = len(n.path) == 1 && n.isLeaf
+				}
+
+				return nil, tsr, false
+			}
+		}
+
+		// nothing found
+		tsr = (path == "/") ||
+			(len(n.path) == len(path)+1 && n.path[len(path)] == '/' &&
+				path == n.path[:len(n.path)-1] && n.isLeaf)
+		return nil, tsr, false
+	}
 }

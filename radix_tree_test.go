@@ -44,7 +44,7 @@ func checkNodeValid(t *testing.T, n *node, e nodeExpceted) {
 		t.Errorf("n should have %d childrens, but n is: %+v", e.childrenNum, n)
 	}
 
-	if n.leaf != e.isLeaf {
+	if n.isLeaf != e.isLeaf {
 		t.Errorf("n.leaf should be %t, but n is: %+v", e.isLeaf, n)
 	}
 
@@ -212,13 +212,13 @@ func TestInsertCatchAllNoSlash(t *testing.T) {
 func TestAddRoute(t *testing.T) {
 	n := &node{}
 
-	n.AddRoute("/user/hello", GET, POST)
+	n.addRoute("/user/hello", GET, POST)
 	checkNodeValid(
 		t, n,
 		nodeExpceted{"/user/hello", root, GET | POST, false, true, 0, true, false},
 	)
 
-	n.AddRoute("/user/world", DELETE)
+	n.addRoute("/user/world", DELETE)
 	checkNodeValid(
 		t, n,
 		nodeExpceted{"/user/", root, NONE, false, false, 2, false, true},
@@ -243,7 +243,7 @@ func TestAddRoute(t *testing.T) {
 func TestAddRouteWildChild(t *testing.T) {
 	n := &node{}
 
-	n.AddRoute("/user/:name/hello", GET)
+	n.addRoute("/user/:name/hello", GET)
 	checkNodeValid(
 		t, n,
 		nodeExpceted{"/user/", root, NONE, true, true, 1, false, true},
@@ -265,13 +265,13 @@ func TestAddRouteWildChild(t *testing.T) {
 func TestAddRouteDualWildChild(t *testing.T) {
 	n := &node{}
 
-	n.AddRoute("/user/:name/hello", GET)
+	n.addRoute("/user/:name/hello", GET)
 	checkNodeValid(
 		t, n,
 		nodeExpceted{"/user/", root, NONE, true, true, 1, false, true},
 	)
 
-	n.AddRoute("/user/:name/hello/:card", GET)
+	n.addRoute("/user/:name/hello/:card", GET)
 	checkNodeValid(
 		t, n,
 		nodeExpceted{"/user/", root, NONE, true, true, 1, false, true},
@@ -306,31 +306,125 @@ func TestAddRouteWildParamConflict(t *testing.T) {
 	defer shouldPanic()
 
 	n := &node{}
-	n.AddRoute("/user/:name/hello/world")
-	n.AddRoute("/user/*whoever")
+	n.addRoute("/user/:name/hello/world")
+	n.addRoute("/user/*whoever")
 }
 
 func TestAddRouteMultiIndices(t *testing.T) {
 	n := &node{}
-	n.AddRoute("/user/:name/hello/world")
-	n.AddRoute("/use/this")
-	n.AddRoute("/usea/this")
-	n.AddRoute("/useb/that")
-	n.AddRoute("/usea/that")
+	n.addRoute("/user/:name/hello/world")
+	n.addRoute("/use/this")
+	n.addRoute("/usea/this")
+	n.addRoute("/useb/that")
+	n.addRoute("/usea/that")
 }
 
 func TestAddRouteSamePath(t *testing.T) {
 	n := &node{}
 
-	n.AddRoute("/user/hello", GET, POST)
+	n.addRoute("/user/hello", GET, POST)
 	checkNodeValid(
 		t, n,
 		nodeExpceted{"/user/hello", root, GET | POST, false, true, 0, true, false},
 	)
 
-	n.AddRoute("/user/hello", DELETE)
+	n.addRoute("/user/hello", DELETE)
 	checkNodeValid(
 		t, n,
 		nodeExpceted{"/user/hello", root, GET | POST | DELETE, false, true, 0, true, false},
 	)
+}
+
+type byPathExpected struct {
+	node  *node
+	tsr   bool
+	found bool
+}
+
+func checkByPath(t *testing.T, n *node, tsr bool, found bool, e byPathExpected) {
+	if n != e.node {
+		t.Errorf("node should be %+v, but got: %+v", e.node, n)
+	}
+
+	if tsr != e.tsr {
+		t.Errorf("tsr should be %t, but got: %t", e.tsr, tsr)
+	}
+
+	if found != e.found {
+		t.Errorf("found should be %t, but got: %t", e.found, found)
+	}
+}
+
+func TestByPath(t *testing.T) {
+	n := &node{}
+	n.addRoute("/user", GET, DELETE)
+
+	checkNodeValid(
+		t, n,
+		nodeExpceted{"/user", root, GET | DELETE, false, true, 0, true, false},
+	)
+
+	nd, tsr, found := n.byPath("/user")
+	checkByPath(t, nd, tsr, found, byPathExpected{n, false, true})
+
+	nd, tsr, found = n.byPath("/user/")
+	checkByPath(t, nd, tsr, found, byPathExpected{nil, true, false})
+
+	nd, tsr, found = n.byPath("/what???")
+	checkByPath(t, nd, tsr, found, byPathExpected{nil, false, false})
+
+	n = &node{}
+	n.addRoute("/user/", GET, DELETE)
+	n.addRoute("/usera", GET, DELETE)
+
+	checkNodeValid(
+		t, n,
+		nodeExpceted{"/user", root, NONE, false, false, 2, false, true},
+	)
+	nd, tsr, found = n.byPath("/user")
+	checkByPath(t, nd, tsr, found, byPathExpected{nil, true, false})
+}
+
+func TestByPathWithWildchild(t *testing.T) {
+	n := &node{}
+	n.addRoute("/user/:name/hello", GET, DELETE)
+	n.addRoute("/use/:this/that", GET, DELETE)
+
+	checkNodeValid(
+		t, n,
+		nodeExpceted{"/use", root, NONE, false, false, 2, false, true},
+	)
+
+	nd, tsr, found := n.byPath("/user/jhon")
+	checkByPath(t, nd, tsr, found, byPathExpected{nil, false, false})
+
+	nd, tsr, found = n.byPath("/user/jhon/hello/")
+	checkByPath(t, nd, tsr, found, byPathExpected{nil, true, false})
+}
+
+func TestByPathParamAndCatchAll(t *testing.T) {
+	n := &node{}
+	n.addRoute("/user/:name", GET, DELETE)
+
+	nd, tsr, found := n.byPath("/user/jhon")
+	checkByPath(t, nd, tsr, found, byPathExpected{n.children[0], false, true})
+	nd, tsr, found = n.byPath("/user/jhon/")
+	checkByPath(t, nd, tsr, found, byPathExpected{nil, true, false})
+
+	n = &node{}
+	n.addRoute("/user/*name", GET, DELETE)
+
+	nd, tsr, found = n.byPath("/user/jhon")
+	checkByPath(t, nd, tsr, found, byPathExpected{n.children[0], false, true})
+}
+
+func TestByPathBadNode(t *testing.T) {
+	defer shouldPanic()
+
+	n := &node{}
+	n.addRoute("/user/:name", GET, DELETE)
+	child := n.children[0]
+	child.nType = static
+
+	n.byPath("/user/jhon")
 }
