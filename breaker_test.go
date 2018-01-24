@@ -92,7 +92,7 @@ func BenchmarkServeHTTP(b *testing.B) {
 	fakeBackend.Port = 10989
 	fakeBackend.Weight = 1
 
-	breaker.apps[appName].AddRoute("/", "GET")
+	breaker.apps[appName].AddRoute("/src/this", "GET")
 
 	for i := 0; i < b.N; i++ {
 		breaker.ServeHTTP(w, r)
