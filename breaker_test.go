@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strconv"
 	"strings"
 	"testing"
 )
@@ -17,10 +16,9 @@ func TestBreakerServeHTTP(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed to parse fakeServer address: %s", fakeServer.URL)
 	}
-	p, _ := strconv.Atoi(u.Port())
 
 	fakeBackend.Host = u.Host
-	fakeBackend.Port = p
+	fakeBackend.Port = u.Port()
 	fakeBackend.Weight = 0
 
 	fb := fakeBalancer{}
@@ -89,7 +87,7 @@ func BenchmarkServeHTTP(b *testing.B) {
 	)
 
 	fakeBackend.Host = "127.0.0.1"
-	fakeBackend.Port = 10989
+	fakeBackend.Port = "10989"
 	fakeBackend.Weight = 1
 
 	breaker.apps[appName].AddRoute("/src/this", "GET")

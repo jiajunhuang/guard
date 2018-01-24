@@ -37,7 +37,7 @@ func Proxy(balancer Balancer, w http.ResponseWriter, r *http.Request) {
 
 	director := func(req *http.Request) {
 		req.URL.Scheme = "http"
-		req.URL.Host = backend.ToURL()
+		req.URL.Host = backend.url
 		req.Header.Add("X-Real-IP", r.Host)
 		req.Header.Add("X-Forwarded-By", "Guard")
 	}

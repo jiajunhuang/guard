@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strconv"
 	"strings"
 	"testing"
 )
@@ -42,10 +41,9 @@ func TestProxy(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed to parse fakeServer address: %s", fakeServer.URL)
 	}
-	p, _ := strconv.Atoi(u.Port())
 
 	fakeBackend.Host = u.Host
-	fakeBackend.Port = p
+	fakeBackend.Port = u.Port()
 	fakeBackend.Weight = 1
 
 	fb := fakeBalancer{}
@@ -61,10 +59,9 @@ func TestProxyNotFound(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed to parse fakeServer address: %s", fakeServer.URL)
 	}
-	p, _ := strconv.Atoi(u.Port())
 
 	fakeBackend.Host = u.Host
-	fakeBackend.Port = p
+	fakeBackend.Port = u.Port()
 	fakeBackend.Weight = 0
 
 	fb := fakeBalancer{}
@@ -86,7 +83,7 @@ func BenchmarkProxy(b *testing.B) {
 	r := httptest.NewRequest("GET", "/", nil)
 
 	fakeBackend.Host = "127.0.0.1"
-	fakeBackend.Port = 10989
+	fakeBackend.Port = "10989"
 	fakeBackend.Weight = 1
 
 	for i := 0; i < b.N; i++ {

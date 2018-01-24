@@ -22,9 +22,9 @@ workflow:
 */
 
 func main() {
-	backend1 := Backend{"127.0.0.1", 80, 5}
-	backend2 := Backend{"127.0.0.1", 80, 1}
-	backend3 := Backend{"127.0.0.1", 80, 1}
+	backend1 := NewBackend("127.0.0.1", "80", 5)
+	backend2 := NewBackend("127.0.0.1", "80", 1)
+	backend3 := NewBackend("127.0.0.1", "80", 1)
 	appName := "www.example.com"
 
 	breaker := NewBreaker()

@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strconv"
 	"testing"
 )
 
@@ -39,10 +38,9 @@ func TestApplicationNilTree(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed to parse fakeServer address: %s", fakeServer.URL)
 	}
-	p, _ := strconv.Atoi(u.Port())
 
 	fakeBackend.Host = u.Host
-	fakeBackend.Port = p
+	fakeBackend.Port = u.Port()
 	fakeBackend.Weight = 0
 
 	fb := fakeBalancer{}
@@ -64,10 +62,9 @@ func TestApplicationNilBalancer(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed to parse fakeServer address: %s", fakeServer.URL)
 	}
-	p, _ := strconv.Atoi(u.Port())
 
 	fakeBackend.Host = u.Host
-	fakeBackend.Port = p
+	fakeBackend.Port = u.Port()
 	fakeBackend.Weight = 0
 
 	r, _ := http.NewRequest("GET", "/", nil)
@@ -85,10 +82,9 @@ func TestApplicationRedirect(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed to parse fakeServer address: %s", fakeServer.URL)
 	}
-	p, _ := strconv.Atoi(u.Port())
 
 	fakeBackend.Host = u.Host
-	fakeBackend.Port = p
+	fakeBackend.Port = u.Port()
 	fakeBackend.Weight = 1
 
 	fb := fakeBalancer{}
@@ -138,10 +134,9 @@ func TestApplicationCircuit(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed to parse fakeServer address: %s", fakeServer.URL)
 	}
-	p, _ := strconv.Atoi(u.Port())
 
 	fakeBackend.Host = u.Host
-	fakeBackend.Port = p
+	fakeBackend.Port = u.Port()
 	fakeBackend.Weight = 0
 
 	fb := fakeBalancer{}

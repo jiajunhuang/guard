@@ -1,21 +1,18 @@
 package main
 
-import (
-	"strconv"
-)
-
 // load balancer: return which backend should we proxy to
 
 // Backend is the backend server, usally a app server like: gunicorn+flask
 type Backend struct {
 	Host   string `json:"host"`
-	Port   int    `json:"port"`
+	Port   string `json:"port"`
 	Weight int    `json:"weight"`
+	url    string // cache the result
 }
 
-// ToURL return a string that is host:port style
-func (b Backend) ToURL() string {
-	return b.Host + ":" + strconv.Itoa(b.Port)
+// NewBackend return a new backend
+func NewBackend(host string, port string, weight int) Backend {
+	return Backend{host, port, weight, host + ":" + port}
 }
 
 // Balancer should have a method `Select`, which return the backend we should
