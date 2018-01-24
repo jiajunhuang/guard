@@ -134,7 +134,6 @@ func TestApplicationRedirect(t *testing.T) {
 func TestApplicationCircuit(t *testing.T) {
 	fakeServer := httptest.NewServer(http.HandlerFunc(fakeHandler))
 	defer fakeServer.Close()
-	println(fakeServer.URL)
 	u, err := url.ParseRequestURI(fakeServer.URL)
 	if err != nil {
 		t.Errorf("failed to parse fakeServer address: %s", fakeServer.URL)
