@@ -6,6 +6,7 @@ status.
 */
 
 import (
+	"fmt"
 	"net/http"
 )
 
@@ -26,7 +27,7 @@ func (b *Breaker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var app *Application
 	var exist bool
 	if app, exist = b.apps[appName]; !exist {
-		w.Write([]byte("app " + appName + " not exist"))
+		fmt.Fprintf(w, "app %s not exist", appName)
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}

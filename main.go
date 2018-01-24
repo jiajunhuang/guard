@@ -1,5 +1,9 @@
 package main
 
+import (
+	"net/http"
+)
+
 /*
 guard is a high performance circuit breaker written in Go.
 
@@ -18,9 +22,17 @@ workflow:
 */
 
 func main() {
-	n := &node{}
+	backend1 := Backend{"127.0.0.1", 80, 5}
+	backend2 := Backend{"127.0.0.1", 80, 1}
+	backend3 := Backend{"127.0.0.1", 80, 1}
+	appName := "www.example.com"
 
-	n.addRoute("/user/jhon", GET, DELETE)
+	breaker := NewBreaker()
+	breaker.apps[appName] = NewApp(
+		NewWRR(backend1, backend2, backend3), true,
+	)
 
-	n.byPath("/user/jhon")
+	breaker.apps[appName].AddRoute("/", "GET")
+
+	http.ListenAndServe(":23456", breaker)
 }
