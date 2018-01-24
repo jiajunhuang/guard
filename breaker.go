@@ -1,14 +1,13 @@
 package main
 
+import (
+	"github.com/valyala/fasthttp"
+)
+
 /*
 circuit breaker, response for handle requests, decide reject it or not, record response
 status.
 */
-
-import (
-	"fmt"
-	"net/http"
-)
 
 // Breaker is circuit breaker, it's a collection of Application
 type Breaker struct {
@@ -22,15 +21,15 @@ func NewBreaker() *Breaker {
 	}
 }
 
-func (b *Breaker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	appName := r.Host
+func (b *Breaker) ServeHTTP(ctx *fasthttp.RequestCtx) {
+	appName := string(ctx.Host())
 	var app *Application
 	var exist bool
 	if app, exist = b.apps[appName]; !exist {
-		fmt.Fprintf(w, "app %s not exist", appName)
-		w.WriteHeader(http.StatusNotFound)
+		ctx.WriteString("app " + appName + " not exist")
+		ctx.SetStatusCode(fasthttp.StatusNotFound)
 		return
 	}
 
-	app.ServeHTTP(w, r)
+	app.ServeHTTP(ctx)
 }

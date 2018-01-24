@@ -5,45 +5,34 @@ proxy server
 */
 
 import (
-	"net"
-	"net/http"
-	"net/http/httputil"
-	"time"
+	"log"
+
+	"github.com/valyala/fasthttp"
 )
 
-var (
-	transport http.RoundTripper = &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-			DualStack: true,
-		}).DialContext,
-		MaxIdleConns:          2048,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-		MaxIdleConnsPerHost:   2048,
-	}
-)
-
-// Proxy use httputil.ReverseProxy
-func Proxy(balancer Balancer, w http.ResponseWriter, r *http.Request) {
+// Proxy use fasthttp: https://github.com/valyala/fasthttp/issues/64
+func Proxy(balancer Balancer, ctx *fasthttp.RequestCtx) int {
 	backend, found := balancer.Select()
 	if !found {
-		w.WriteHeader(http.StatusForbidden)
-		return
+		ctx.SetStatusCode(fasthttp.StatusForbidden)
+		return fasthttp.StatusForbidden
 	}
 
-	director := func(req *http.Request) {
-		req.URL.Scheme = "http"
-		req.URL.Host = backend.url
-		req.Header.Add("X-Real-IP", r.Host)
-		req.Header.Add("X-Forwarded-By", "Guard")
+	client := backend.client
+	req := &ctx.Request
+	resp := &ctx.Response
+
+	// prepare
+	req.Header.Del("Connection")
+
+	// proxy
+	if err := client.Do(req, resp); err != nil {
+		log.Printf("failed to proxy: %s", err)
+		return 0
 	}
-	proxy := &httputil.ReverseProxy{
-		Director:  director,
-		Transport: transport,
-	}
-	proxy.ServeHTTP(w, r)
+
+	// after
+	resp.Header.Del("Connection")
+
+	return 200
 }
