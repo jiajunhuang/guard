@@ -1,158 +1,104 @@
 package main
 
 import (
-	"strconv"
-	"sync"
+	"log"
+	"net/http"
 	"sync/atomic"
 	"time"
+	"unsafe"
 )
-
-/*
-timeline is a singly linked list wrapper, whose node is a bucket that stores response
-status of each URL. we don't care what HTTP Method extracly, we just care about URL.
-
-                    +----------+
-                    | timeline |
-                    +----------+
-                   /            \
-              +--------+        +--------+
-              |  head  |->....->|  tail  |
-              +--------+        +--------+
-
-and each bucket is a map, the key is {GenericURL}@{HTTP Response Status Code}, like:
-`/user/:/hello@200`, `/user/*@500`, `/user/:@502`, etc.
-
-each bucket collect all the response status in recent 10 seconds. the key of bucket
-is timestamp%10
-*/
 
 const (
-	bucketStep = 10 // each bucket stores response code in last `bucketStep` seconds
-	maxBuckets = 60 // we store `maxBuckets` buckets
+	statusStep   int64 = 10
+	maxStatusLen       = 12
 )
 
-// RightNow return latest bucket key
+// RightNow return status key
 func RightNow() int64 {
-	ts := time.Now().Unix()
-	return ts - ts%bucketStep
+	t := time.Now().Unix()
+	return t - t%statusStep
 }
 
-// Status is an collection of status: 200, 429, 500, 502
+// Status is for counting http status code
+// uint32 can be at most 4294967296, it's enough for proxy server, because this
+// means in the past second, you've received 4294967296 requests, 429496729/second.
 type Status struct {
-	OK              uint32 `json:"ok"`
-	TooManyRequests uint32 `json:"too_many_requests"`
-	InternalError   uint32 `json:"internal_error"`
-	BadGateway      uint32 `json:"bad_gateway"`
+	prev            *Status
+	next            *Status
+	key             int64 // for now, key is time
+	OK              uint32
+	TooManyRequests uint32
+	InternalError   uint32
+	BadGateway      uint32
 }
 
-// Counter counts value of key
-type Counter map[string]*Status
+// StatusRing return a ring of status
+func StatusRing() *Status {
+	head := &Status{}
+	cursor := head
 
-// Bucket is bucket in timeline
-type Bucket struct {
-	key     int64
-	counter Counter
-	next    *Bucket
-}
-
-// NewBucket return a brand new bucket with given key
-func NewBucket(key int64) *Bucket {
-	return &Bucket{key: key, counter: make(Counter)}
-}
-
-// Timeline is a singly linked list wrapper
-type Timeline struct {
-	lock sync.RWMutex
-	head *Bucket
-	tail *Bucket
-}
-
-// NewTimeline return a brand new timeline
-func NewTimeline() *Timeline {
-	b := Bucket{key: RightNow(), counter: make(Counter)}
-	t := Timeline{}
-	t.head = &b
-	t.tail = &b
-
-	return &t
-}
-
-// Incr increase by 1 on the given genericURL and status code, return value after incr
-func (t *Timeline) Incr(url string, code int) uint32 {
-	now := RightNow()
-	tail := t.tail
-
-	if tail == nil {
-		panic("timelist should always has at least one bucket, but now tail is pointer to nil")
+	for i := 0; i < maxStatusLen-1; i++ {
+		cursor.next = &Status{}
+		cursor.next.prev = cursor
+		cursor = cursor.next
 	}
 
-	// lock...
-	t.lock.Lock()
+	head.prev = cursor
+	cursor.next = head
 
-	if tail.key != now {
-		b := NewBucket(now)
-		tail.next = b
-		t.tail = b
-		tail = b
-	}
+	return head
+}
 
-	// check if head is outdated
-	oldest := now - bucketStep*maxBuckets
-	for {
-		if t.head.key < oldest {
-			t.head = t.head.next
-		} else {
-			break
+// refreshStatus refresh the current status if it's outdate, and return the latest one
+func (n *node) refreshStatus(now int64) *Status {
+	status := n.status
+	if status.key != now {
+		if atomic.CompareAndSwapPointer(
+			// first, get address of n.status, means, address of `status field in n`, get it's address,
+			// cast it to `*unsafe.Pointer`
+			(*unsafe.Pointer)(unsafe.Pointer(&(n.status))), unsafe.Pointer(status), unsafe.Pointer(status.next),
+		) {
+			// clean old data, though it may cause some dirty reads
+			atomic.StoreInt64(&n.status.key, now)
+			atomic.StoreUint32(&n.status.OK, 0)
+			atomic.StoreUint32(&n.status.TooManyRequests, 0)
+			atomic.StoreUint32(&n.status.InternalError, 0)
+			atomic.StoreUint32(&n.status.BadGateway, 0)
 		}
 	}
 
-	var status *Status
-	status = tail.counter[url]
-	if status == nil {
-		status = &Status{}
-		tail.counter[url] = status
+	return n.status
+}
+
+// incr increase by 1 on the given genericURL and status code, return value after incr
+func (n *node) incr(code int) uint32 {
+	if n.status == nil {
+		log.Panicf("status of node %+v is nil", n)
 	}
 
-	// defer is too slow
-	t.lock.Unlock()
-
+	status := n.refreshStatus(RightNow())
 	switch code {
-	case 200:
+	case http.StatusOK:
 		return atomic.AddUint32(&status.OK, 1)
-	case 429:
+	case http.StatusTooManyRequests:
 		return atomic.AddUint32(&status.TooManyRequests, 1)
-	case 500:
+	case http.StatusInternalServerError:
 		return atomic.AddUint32(&status.InternalError, 1)
-	case 502:
+	case http.StatusBadGateway:
 		return atomic.AddUint32(&status.BadGateway, 1)
 	default:
-		panic("bad status code" + strconv.Itoa(code))
+		log.Printf("ignore status code %d", code)
+		return 0 // just for go lint, code here should never been execute
 	}
 }
 
-// QueryStatus return counts of status 200, 429, 500, 502, and failure ratio
-func (t *Timeline) QueryStatus(url string) (uint32, uint32, uint32, uint32, float64) {
-	tail := t.tail
-	if tail == nil {
-		panic("t.tail should never be nil")
+func (n *node) query() (uint32, uint32, uint32, uint32, float64) {
+	if n.status == nil {
+		log.Panicf("status of node %+v is nil", n)
 	}
 
-	var status *Status
-
-	// lock
-	t.lock.RLock()
-
-	status = tail.counter[url]
-	if status == nil {
-		// it will be created while execute Incr
-		t.lock.RUnlock()
-		return 0, 0, 0, 0, 0.0
-	}
-
+	status := n.refreshStatus(RightNow())
 	ok, too, internal, bad := status.OK, status.TooManyRequests, status.InternalError, status.BadGateway
-
-	// defer is too slow
-	t.lock.RUnlock()
 
 	ratio := float64(
 		too+internal+bad,

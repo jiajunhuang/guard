@@ -1,117 +1,153 @@
 package main
 
 import (
+	"net/http"
 	"testing"
 )
 
-func TestRightNow(t *testing.T) {
-	if RightNow() != RightNow() {
-		t.Fatalf("right now should return the same result")
+func TestStatusRing(t *testing.T) {
+	ring := StatusRing()
+	cursor := ring
+
+	for i := 0; i < maxStatusLen; i++ {
+		cursor = cursor.next
+	}
+
+	if cursor != ring {
+		t.Errorf("after loop, cursor should equal to ring(%+v), but got: %+v", ring, cursor)
 	}
 }
 
-func TestTimelineIncr(t *testing.T) {
-	tl := NewTimeline()
+func TestIncr(t *testing.T) {
+	n := &node{}
+	n.addRoute("/user/hello")
+
+	n.incr(http.StatusOK)
+	n.incr(http.StatusTooManyRequests)
+	n.incr(http.StatusInternalServerError)
+	n.incr(http.StatusBadGateway)
+}
+
+func TestBadIncrStatusIsNil(t *testing.T) {
+	defer shouldPanic()
+
+	n := &node{}
+	n.incr(http.StatusOK)
+}
+
+func TestQuery(t *testing.T) {
+	n := &node{}
+	n.addRoute("/user")
+
+	ok, too, internal, bad, _ := n.query()
+
+	if ok != 0 {
+		t.Errorf("ok should be 0, but it is %d", ok)
+	}
+	if too != 0 {
+		t.Errorf("too should be 0, but it is %d", too)
+	}
+	if internal != 0 {
+		t.Errorf("internal should be 0, but it is %d", internal)
+	}
+	if bad != 0 {
+		t.Errorf("bad should be 0, but it is %d", bad)
+	}
+
+	for i := 0; i < 100; i++ {
+		n.incr(http.StatusInternalServerError)
+		n.incr(http.StatusBadGateway)
+		n.incr(http.StatusTooManyRequests)
+	}
+
+	ok, too, internal, bad, ratio := n.query()
+
+	if ok != 0 {
+		t.Errorf("ok should be 0, but it is %d", ok)
+	}
+	if too != 100 {
+		t.Errorf("too should be 100, but it is %d", too)
+	}
+	if internal != 100 {
+		t.Errorf("internal should be 100, but it is %d", internal)
+	}
+	if bad != 100 {
+		t.Errorf("bad should be 100, but it is %d", bad)
+	}
+
+	if ratio < 0.75 {
+		t.Errorf("ratio should at least 0.75, but it is %f", ratio)
+	}
+}
+
+func TestQueryNilStatus(t *testing.T) {
+	defer shouldPanic()
+
+	n := &node{}
+
+	n.query()
+}
+
+func TestRefreshStatus(t *testing.T) {
+	n := &node{}
+	n.addRoute("/user/hello", GET)
+
+	status := n.status
 	now := RightNow()
-	oldest := now - (maxBuckets+1)*bucketStep
+	n.status.key = now - 3*statusStep
 
-	tl.head.key = oldest
-	originHead := tl.head
-	// create buckets manually
-	for i := maxBuckets; i > 0; i-- {
-		tl.head.next = NewBucket(now - int64(i*bucketStep))
-		tl.head = tl.head.next
+	n.refreshStatus(now)
+	if n.status == status {
+		t.Errorf("n.status should refresh to %d, but it's %+v", now, n.status)
 	}
-	tl.head = originHead
 
-	tl.Incr("/user/:/hello", 200)
-}
-
-func TestBucketKey(t *testing.T) {
-	r := "/user/:/hello"
-	if r != "/user/:/hello" {
-		t.Errorf("`BucketKey` should return `/user/:/hello`, but got: %s", r)
+	status = n.status
+	if status.key != now {
+		t.Errorf("brand new status's key should be %d, but status is: %+v, status.prev is: %+v, status.next is: %+v", now, status, status.prev, status.next)
+	}
+	if status.OK != 0 || status.TooManyRequests != 0 || status.InternalError != 0 || status.BadGateway != 0 {
+		t.Errorf("brand new status's property should be reset, but it not: %+v", status)
 	}
 }
 
-func TestQueryStatus(t *testing.T) {
-	tl := NewTimeline()
-	url := "/user/:/hello"
-	tl.Incr(url, 200)
-	tl.Incr(url, 429)
-	tl.Incr(url, 500)
-	tl.Incr(url, 502)
+func TestRefreshStatusShouldNotRefresh(t *testing.T) {
+	n := &node{}
+	n.addRoute("/user/hello", GET)
 
-	t.Logf("bucket: %+v, counter: %+v", tl.tail, tl.tail.counter[url])
-	c200, c429, c500, c502, _ := tl.QueryStatus(url)
-	if c200 != 1 || c429 != 1 || c500 != 1 || c502 != 1 {
-		t.Errorf("timebucket incr error, status of 200, 429, 500, 502 should be one")
+	now := RightNow()
+	status := n.status
+	status.key = now
+	n.refreshStatus(now)
+	if n.status != status {
+		t.Errorf("n.status should not be refreshed, should be %p, but n is: %+v", status, n)
 	}
 }
 
-func TestIncrWithNilTail(t *testing.T) {
-	defer func() {
-		err := recover()
-		if err == nil {
-			t.Error("timeline.Incr should panic because it's tail is nil, but it not")
-		}
-	}()
-
-	tl := NewTimeline()
-	tl.tail = nil
-	url := "/user/:/hello"
-	code := 200
-
-	tl.Incr(url, code)
-}
-
-func TestIncrWithBadCode(t *testing.T) {
-	defer func() {
-		err := recover()
-		if err == nil {
-			t.Error("timeline.Incr should panic because code is invalid, but it not")
-		}
-	}()
-
-	tl := NewTimeline()
-	url := "/user/:/hello"
-	code := 1024
-
-	tl.Incr(url, code)
-}
-
-func TestQueryStatusWithNilTail(t *testing.T) {
-	defer func() {
-		err := recover()
-		if err == nil {
-			t.Error("timeline.QueryStatus should panic because it's tail is nil, but it not")
-		}
-	}()
-
-	tl := NewTimeline()
-	tl.tail = nil
-	url := "/user/:/hello"
-
-	tl.QueryStatus(url)
-}
-
+// benchmark
 func BenchmarkIncr(b *testing.B) {
-	tl := NewTimeline()
+	n := &node{}
+	n.addRoute("/user/hello")
 
 	for i := 0; i < b.N; i++ {
-		tl.Incr("/user/:/hello", 200)
+		n.incr(http.StatusBadGateway)
 	}
 }
 
-func BenchmarkQueryStatus(b *testing.B) {
-	tl := NewTimeline()
+func BenchmarkQuery(b *testing.B) {
+	n := &node{}
+	n.addRoute("/user/hello")
 
-	tl.Incr("/user/:/hello", 200)
-	tl.Incr("/user/:/hello", 429)
-	tl.Incr("/user/:/hello", 500)
-	tl.Incr("/user/:/hello", 502)
+	for i := 0; i < 100; i++ {
+		n.incr(http.StatusBadGateway)
+	}
 
 	for i := 0; i < b.N; i++ {
-		tl.QueryStatus("/user/:/hello")
+		n.query()
+	}
+}
+
+func BenchmarkRightNow(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		RightNow()
 	}
 }

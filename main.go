@@ -1,5 +1,9 @@
 package main
 
+import (
+	"net/http"
+)
+
 /*
 guard is a high performance circuit breaker written in Go.
 
@@ -17,107 +21,18 @@ workflow:
                                  -> circuot breaker is open? return 429 too many requests
 */
 
-import (
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"log"
-	"net/http"
-	"strings"
-)
-
-var (
-	// global variable
-	breaker = NewBreaker()
-)
-
-// APP registration infomation
-type APP struct {
-	Name     string    `json:"name"`
-	URLs     []string  `json:"urls"`
-	Methods  []string  `json:"methods"`
-	Backends []Backend `json:"backends"`
-}
-
-func fakeProxyHandler(w http.ResponseWriter, r *http.Request, _ Params) {}
-
-func overrideAPP(breaker *Breaker, app APP) {
-	breaker.UpdateAPP(app.Name)
-	router := breaker.routers[app.Name]
-
-	for i, url := range app.URLs {
-		router.Handle(strings.ToUpper(app.Methods[i]), url, fakeProxyHandler)
-	}
-	breaker.balancers[app.Name] = NewWRR(app.Backends...)
-}
-
-func createAPPHandler(w http.ResponseWriter, r *http.Request, _ Params) {
-	var app APP
-	var err error
-
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("failed" + err.Error()))
-		return
-	}
-	if err = json.Unmarshal(body, &app); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("failed" + err.Error()))
-		return
-	}
-	if len(app.Methods) != len(app.URLs) {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("failed: methods and urls should have same length and 1:1"))
-		return
-	}
-
-	log.Printf("gonna insert or over write app %s's configuration", app.Name)
-	overrideAPP(breaker, app)
-
-	fmt.Fprintf(w, "success!")
-}
-
-func inspectAPPHandler(w http.ResponseWriter, r *http.Request, ps Params) {
-	type jsonObject map[string]interface{}
-
-	app := ps.ByName("app")
-	jsonBody := jsonObject{}
-	jsonBytes := []byte{}
-	tl := breaker.timelines[app]
-	if tl == nil {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	tl.lock.RLock()
-	defer tl.lock.RUnlock()
-
-	cursor := tl.head
-	jsonBody["app"] = app
-	counters := []Counter{}
-
-	for cursor != nil {
-		counters = append(counters, cursor.counter)
-		cursor = cursor.next
-	}
-
-	jsonBody["counters"] = counters
-
-	jsonBytes, _ = json.Marshal(jsonBody)
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(jsonBytes)
-}
-
-func proxy() {
-	log.Fatal(http.ListenAndServe(":23456", breaker))
-}
-
 func main() {
-	router := NewRouter()
-	router.POST("/app", createAPPHandler)
-	router.GET("/inspect/:app", inspectAPPHandler)
+	backend1 := Backend{"127.0.0.1", 80, 5}
+	backend2 := Backend{"127.0.0.1", 80, 1}
+	backend3 := Backend{"127.0.0.1", 80, 1}
+	appName := "www.example.com"
 
-	go proxy()
-	log.Fatal(http.ListenAndServe(":12345", router))
+	breaker := NewBreaker()
+	breaker.apps[appName] = NewApp(
+		NewWRR(backend1, backend2, backend3), true,
+	)
+
+	breaker.apps[appName].AddRoute("/", "GET")
+
+	http.ListenAndServe(":23456", breaker)
 }
