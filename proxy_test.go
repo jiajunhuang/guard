@@ -62,26 +62,3 @@ func TestProxyWorks(t *testing.T) {
 		t.Errorf("response code should be %d but got: %d", fasthttp.StatusOK, code)
 	}
 }
-
-func BenchmarkProxy(b *testing.B) {
-	ln := fasthttputil.NewInmemoryListener()
-	defer ln.Close()
-
-	go fasthttp.Serve(ln, fakeHandler)
-
-	fakeBackend.url = ln.Addr().String()
-	fakeBackend.Weight = 1
-
-	fb := fakeBalancer{}
-
-	ctx := &fasthttp.RequestCtx{}
-	ctx.Request.SetRequestURI("/")
-
-	for i := 0; i < b.N; i++ {
-		Proxy(fb, ctx)
-	}
-
-	if code := ctx.Response.StatusCode(); code != fasthttp.StatusForbidden {
-		b.Errorf("response code should be %d but got: %d", fasthttp.StatusForbidden, code)
-	}
-}

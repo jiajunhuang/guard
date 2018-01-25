@@ -28,11 +28,11 @@ func Proxy(balancer Balancer, ctx *fasthttp.RequestCtx) int {
 	// proxy
 	if err := client.Do(req, resp); err != nil {
 		log.Printf("failed to proxy: %s", err)
-		return 0
+		return fasthttp.StatusBadGateway
 	}
 
 	// after
 	resp.Header.Del("Connection")
 
-	return 200
+	return fasthttp.StatusOK
 }

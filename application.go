@@ -109,9 +109,6 @@ func (a *Application) ServeHTTP(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	// proxy!
-	code := Proxy(a.balancer, ctx)
-
-	// feedback the result
-	n.incr(code)
+	// proxy! and then feedback the result
+	n.incr(Proxy(a.balancer, ctx))
 }
