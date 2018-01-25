@@ -101,7 +101,7 @@ func appHandler(w http.ResponseWriter, r *http.Request) {
 		app.AddRoute(path, strings.ToUpper(config.Methods[i]))
 	}
 
-	// replace breaker's map
+	// replace breaker's map, FIXME: here may raise data race...
 	breaker.apps[config.Name] = app
 
 	w.Write([]byte("success!"))
