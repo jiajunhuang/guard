@@ -1,6 +1,9 @@
 package main
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/valyala/fasthttp"
@@ -10,6 +13,12 @@ import (
 type fakeBalancer struct{}
 
 var fakeBackend = Backend{}
+
+func setFakeBackend(url string, weight int) {
+	fakeBackend.Weight = weight
+	fakeBackend.url = url
+	fakeBackend.client = &fasthttp.HostClient{Addr: url, MaxConns: fasthttp.DefaultMaxConnsPerHost}
+}
 
 func (b fakeBalancer) Select() (*Backend, bool) {
 	if fakeBackend.Weight == 0 {
@@ -28,8 +37,7 @@ func TestProxyBackendNotFound(t *testing.T) {
 
 	go fasthttp.Serve(ln, fakeHandler)
 
-	fakeBackend.url = ln.Addr().String()
-	fakeBackend.Weight = 0
+	setFakeBackend(ln.Addr().String(), 0)
 
 	fb := fakeBalancer{}
 
@@ -43,19 +51,20 @@ func TestProxyBackendNotFound(t *testing.T) {
 }
 
 func TestProxyWorks(t *testing.T) {
-	ln := fasthttputil.NewInmemoryListener()
-	defer ln.Close()
+	fakeServer := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}),
+	)
+	defer fakeServer.Close()
 
-	go fasthttp.Serve(ln, fakeHandler)
+	u, _ := url.ParseRequestURI(fakeServer.URL)
 
-	fakeBackend.url = ln.Addr().String()
-	fakeBackend.Weight = 1
-	fakeBackend.client = &fasthttp.HostClient{Addr: fakeBackend.url, MaxConns: fasthttp.DefaultMaxConnsPerHost}
+	setFakeBackend(u.Host, 1)
 
 	fb := fakeBalancer{}
 
 	ctx := &fasthttp.RequestCtx{}
-	ctx.Request.SetRequestURI("/")
+	// RequestURI is used first if it's not empty: https://github.com/valyala/fasthttp/issues/114
+	ctx.Request.SetRequestURI("http://" + u.Host + "/")
 	Proxy(fb, ctx)
 
 	if code := ctx.Response.StatusCode(); code != fasthttp.StatusOK {

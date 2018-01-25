@@ -34,5 +34,5 @@ func Proxy(balancer Balancer, ctx *fasthttp.RequestCtx) int {
 	// after
 	resp.Header.Del("Connection")
 
-	return fasthttp.StatusOK
+	return resp.StatusCode()
 }

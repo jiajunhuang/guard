@@ -13,8 +13,7 @@ func TestBreakerServeHTTP(t *testing.T) {
 
 	go fasthttp.Serve(ln, fakeHandler)
 
-	fakeBackend.url = ln.Addr().String()
-	fakeBackend.Weight = 0
+	setFakeBackend(ln.Addr().String(), 0)
 
 	fb := fakeBalancer{}
 	a := NewApp(fb, true)

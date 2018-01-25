@@ -58,8 +58,7 @@ func TestApplicationRedirect(t *testing.T) {
 
 	go fasthttp.Serve(ln, fakeHandler)
 
-	fakeBackend.url = ln.Addr().String()
-	fakeBackend.Weight = 1
+	setFakeBackend(ln.Addr().String(), 1)
 
 	fb := fakeBalancer{}
 	a := NewApp(fb, true)
@@ -109,8 +108,7 @@ func TestApplicationCircuit(t *testing.T) {
 
 	go fasthttp.Serve(ln, fakeHandler)
 
-	fakeBackend.url = ln.Addr().String()
-	fakeBackend.Weight = 1
+	setFakeBackend(ln.Addr().String(), 1)
 
 	fb := fakeBalancer{}
 	a := NewApp(fb, true)
@@ -126,11 +124,17 @@ func TestApplicationCircuit(t *testing.T) {
 	}
 
 	// circuit is not on
-	a.ServeHTTP(ctx)
+	ctx = &fasthttp.RequestCtx{}
+	ctx.Request.SetRequestURI("/user/jhon")
+	ctx.Request.Header.SetMethod("POST")
+	a.ServeHTTP(ctx) // do not check what `Proxy` returns
 
 	// circuit is on
 	for i := 0; i < 100; i++ {
 		a.root.incr(fasthttp.StatusBadGateway)
 	}
 	a.ServeHTTP(ctx)
+	if code := ctx.Response.StatusCode(); code != fasthttp.StatusTooManyRequests {
+		t.Errorf("response code should be %d but got: %d", fasthttp.StatusTooManyRequests, code)
+	}
 }
