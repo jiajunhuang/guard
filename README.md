@@ -102,15 +102,11 @@ $ ./guard
 ```json
 {
     "name": "www.example.com",
-    "urls": ["/"],
-    "methods": ["GET"],
-    "backends": [
-        {
-            "host": "127.0.0.1",
-            "port": 80,
-            "weight": 5
-        }
-    ]
+    "backends": ["127.0.0.1:80", "127.0.0.1:80", "127.0.0.1:80"],
+    "weights": [5, 1, 1],
+    "ratio": 0.3,
+    "paths": ["/"],
+    "methods": ["GET"]
 }
 ```
 
