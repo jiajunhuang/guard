@@ -4,7 +4,6 @@ import (
 	"log"
 	"net/http"
 	"sync/atomic"
-	"time"
 	"unsafe"
 )
 
@@ -15,7 +14,7 @@ const (
 
 // RightNow return status key
 func RightNow() int64 {
-	t := time.Now().Unix()
+	t := CoarseTimeNow().Unix()
 	return t - t%statusStep
 }
 
