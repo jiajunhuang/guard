@@ -1,10 +1,10 @@
 package main
 
 import (
-	"net/http"
-	"net/http/httptest"
-	"net/url"
 	"testing"
+
+	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/fasthttputil"
 )
 
 func TestAddRouteWorks(t *testing.T) {
@@ -32,126 +32,109 @@ func TestAddRouteNoMethod(t *testing.T) {
 func TestApplicationNilTree(t *testing.T) {
 	defer shouldPanic()
 
-	fakeServer := httptest.NewServer(http.HandlerFunc(fakeHandler))
-	defer fakeServer.Close()
-	u, err := url.ParseRequestURI(fakeServer.URL)
-	if err != nil {
-		t.Errorf("failed to parse fakeServer address: %s", fakeServer.URL)
-	}
-
-	fakeBackend.Host = u.Host
-	fakeBackend.Port = u.Port()
-	fakeBackend.Weight = 0
-
-	fb := fakeBalancer{}
-	r, _ := http.NewRequest("GET", "/", nil)
-	w := httptest.NewRecorder()
-
-	a := NewApp(fb, true)
+	a := NewApp(NewRdm(), true)
 	a.root = nil
 
-	a.ServeHTTP(w, r)
+	ctx := &fasthttp.RequestCtx{}
+	ctx.Request.SetRequestURI("/")
+
+	a.ServeHTTP(ctx)
 }
 
 func TestApplicationNilBalancer(t *testing.T) {
 	defer shouldPanic()
 
-	fakeServer := httptest.NewServer(http.HandlerFunc(fakeHandler))
-	defer fakeServer.Close()
-	u, err := url.ParseRequestURI(fakeServer.URL)
-	if err != nil {
-		t.Errorf("failed to parse fakeServer address: %s", fakeServer.URL)
-	}
-
-	fakeBackend.Host = u.Host
-	fakeBackend.Port = u.Port()
-	fakeBackend.Weight = 0
-
-	r, _ := http.NewRequest("GET", "/", nil)
-	w := httptest.NewRecorder()
-
 	a := NewApp(nil, true)
 
-	a.ServeHTTP(w, r)
+	ctx := &fasthttp.RequestCtx{}
+	ctx.Request.SetRequestURI("/")
+
+	a.ServeHTTP(ctx)
 }
 
 func TestApplicationRedirect(t *testing.T) {
-	fakeServer := httptest.NewServer(http.HandlerFunc(fakeHandler))
-	defer fakeServer.Close()
-	u, err := url.ParseRequestURI(fakeServer.URL)
-	if err != nil {
-		t.Errorf("failed to parse fakeServer address: %s", fakeServer.URL)
-	}
+	ln := fasthttputil.NewInmemoryListener()
+	defer ln.Close()
 
-	fakeBackend.Host = u.Host
-	fakeBackend.Port = u.Port()
-	fakeBackend.Weight = 1
+	go fasthttp.Serve(ln, fakeHandler)
+
+	setFakeBackend(ln.Addr().String(), 1)
 
 	fb := fakeBalancer{}
-	w := httptest.NewRecorder()
-
 	a := NewApp(fb, true)
-	r, _ := http.NewRequest("POST", "/user/jhon/", nil)
 	a.AddRoute("/user/jhon", "POST")
 	a.AddRoute("/user/jhon/card/", "POST")
 
-	a.ServeHTTP(w, r)
+	//redirect
+	ctx := &fasthttp.RequestCtx{}
+	ctx.Request.SetRequestURI("/user/jhon/")
+	ctx.Request.Header.SetMethod("POST")
+	a.ServeHTTP(ctx)
+	if code := ctx.Response.StatusCode(); code != fasthttp.StatusTemporaryRedirect {
+		t.Errorf("response code should be %d but got: %d", fasthttp.StatusTemporaryRedirect, code)
+	}
 
 	// redirect
-	if w.Code != http.StatusTemporaryRedirect {
-		t.Errorf("w.Code should be %d but got: %d", http.StatusTemporaryRedirect, w.Code)
-	}
-	r, _ = http.NewRequest("POST", "/user/jhon/card", nil)
-	if w.Code != http.StatusTemporaryRedirect {
-		t.Errorf("w.Code should be %d but got: %d", http.StatusTemporaryRedirect, w.Code)
-	}
-
-	// test not found
-	r, _ = http.NewRequest("POST", "/user/what/", nil)
-	w = httptest.NewRecorder()
-
-	a.ServeHTTP(w, r)
-
-	if w.Code != http.StatusNotFound {
-		t.Errorf("w.Code should be %d but got: %d", http.StatusNotFound, w.Code)
+	ctx = &fasthttp.RequestCtx{}
+	ctx.Request.SetRequestURI("/user/jhon/card")
+	ctx.Request.Header.SetMethod("POST")
+	a.ServeHTTP(ctx)
+	if code := ctx.Response.StatusCode(); code != fasthttp.StatusTemporaryRedirect {
+		t.Errorf("response code should be %d but got: %d", fasthttp.StatusTemporaryRedirect, code)
 	}
 
-	// test method not allowed
-	r, _ = http.NewRequest("GET", "/user/jhon", nil)
-	w = httptest.NewRecorder()
+	// not found
+	ctx = &fasthttp.RequestCtx{}
+	ctx.Request.SetRequestURI("/user/what/card")
+	ctx.Request.Header.SetMethod("POST")
+	a.ServeHTTP(ctx)
+	if code := ctx.Response.StatusCode(); code != fasthttp.StatusNotFound {
+		t.Errorf("response code should be %d but got: %d", fasthttp.StatusNotFound, code)
+	}
 
-	a.ServeHTTP(w, r)
-
-	if w.Code != http.StatusMethodNotAllowed {
-		t.Errorf("w.Code should be %d but got: %d", http.StatusMethodNotAllowed, w.Code)
+	// method not allowed
+	ctx = &fasthttp.RequestCtx{}
+	ctx.Request.SetRequestURI("/user/jhon")
+	ctx.Request.Header.SetMethod("GET")
+	a.ServeHTTP(ctx)
+	if code := ctx.Response.StatusCode(); code != fasthttp.StatusMethodNotAllowed {
+		t.Errorf("response code should be %d but got: %d", fasthttp.StatusMethodNotAllowed, code)
 	}
 }
 
 func TestApplicationCircuit(t *testing.T) {
-	fakeServer := httptest.NewServer(http.HandlerFunc(fakeHandler))
-	defer fakeServer.Close()
-	u, err := url.ParseRequestURI(fakeServer.URL)
-	if err != nil {
-		t.Errorf("failed to parse fakeServer address: %s", fakeServer.URL)
-	}
+	ln := fasthttputil.NewInmemoryListener()
+	defer ln.Close()
 
-	fakeBackend.Host = u.Host
-	fakeBackend.Port = u.Port()
-	fakeBackend.Weight = 0
+	go fasthttp.Serve(ln, fakeHandler)
+
+	setFakeBackend(ln.Addr().String(), 1)
 
 	fb := fakeBalancer{}
-	w := httptest.NewRecorder()
-
 	a := NewApp(fb, true)
-	r, _ := http.NewRequest("POST", "/user/jhon", nil)
 	a.AddRoute("/user/jhon", "POST")
 
+	//redirect
+	ctx := &fasthttp.RequestCtx{}
+	ctx.Request.SetRequestURI("/user/jhon/")
+	ctx.Request.Header.SetMethod("POST")
+	a.ServeHTTP(ctx)
+	if code := ctx.Response.StatusCode(); code != fasthttp.StatusTemporaryRedirect {
+		t.Errorf("response code should be %d but got: %d", fasthttp.StatusTemporaryRedirect, code)
+	}
+
 	// circuit is not on
-	a.ServeHTTP(w, r)
+	ctx = &fasthttp.RequestCtx{}
+	ctx.Request.SetRequestURI("/user/jhon")
+	ctx.Request.Header.SetMethod("POST")
+	a.ServeHTTP(ctx) // do not check what `Proxy` returns
 
 	// circuit is on
 	for i := 0; i < 100; i++ {
-		a.root.incr(http.StatusBadGateway)
+		a.root.incr(fasthttp.StatusBadGateway)
 	}
-	a.ServeHTTP(w, r)
+	a.ServeHTTP(ctx)
+	if code := ctx.Response.StatusCode(); code != fasthttp.StatusTooManyRequests {
+		t.Errorf("response code should be %d but got: %d", fasthttp.StatusTooManyRequests, code)
+	}
 }

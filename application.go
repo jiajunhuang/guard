@@ -2,7 +2,8 @@ package main
 
 import (
 	"log"
-	"net/http"
+
+	"github.com/valyala/fasthttp"
 )
 
 // Application is an abstraction of radix-tree, timeline, balancer, and configurations...
@@ -59,7 +60,7 @@ func (a *Application) AddRoute(path string, methods ...string) {
 	a.root.addRoute(path, convertMethod(methods...))
 }
 
-func (a *Application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (a *Application) ServeHTTP(ctx *fasthttp.RequestCtx) {
 	if a.root == nil {
 		log.Panic("application should bind a URL-tree")
 	}
@@ -67,35 +68,36 @@ func (a *Application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.Panic("application should bind a load balancer")
 	}
 
-	path := r.URL.Path
+	path := string(ctx.Path())
 	n, tsr, found := a.root.byPath(path)
 
 	// redirect?
 	if tsr && a.TSRRedirect {
-		code := http.StatusMovedPermanently
-		if r.Method != "GET" {
-			code = http.StatusTemporaryRedirect
+		code := fasthttp.StatusMovedPermanently
+		if string(ctx.Method()) != "GET" {
+			code = fasthttp.StatusTemporaryRedirect
 		}
 
+		var redirectTo string
 		if len(path) > 1 && path[len(path)-1] == '/' {
-			r.URL.Path = path[:len(path)-1]
+			redirectTo = path[:len(path)-1]
 		} else {
-			r.URL.Path = path + "/"
+			redirectTo = path + "/"
 		}
-		log.Printf("redirect to %s", r.URL.String())
-		http.Redirect(w, r, r.URL.String(), code)
+		log.Printf("redirect to %s", redirectTo)
+		ctx.Redirect(redirectTo, code)
 		return
 	}
 
 	// not found
 	if !found {
-		http.NotFound(w, r)
+		ctx.NotFound()
 		return
 	}
 
 	// method allowed?
-	if !n.hasMethod(convertMethod(r.Method)) {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+	if !n.hasMethod(convertMethod(string(ctx.Method()))) {
+		ctx.SetStatusCode(fasthttp.StatusMethodNotAllowed)
 		return
 	}
 
@@ -103,14 +105,10 @@ func (a *Application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, _, _, _, ratio := n.query()
 	if ratio > 0.3 {
 		log.Printf("too many requests, ratio is %f", ratio)
-		w.WriteHeader(http.StatusTooManyRequests)
+		ctx.SetStatusCode(fasthttp.StatusTooManyRequests)
 		return
 	}
 
-	// proxy!
-	responseWriter := NewResponseWriter(w)
-	Proxy(a.balancer, responseWriter, r)
-
-	// feedback the result
-	n.incr(responseWriter.Status())
+	// proxy! and then feedback the result
+	n.incr(Proxy(a.balancer, ctx))
 }

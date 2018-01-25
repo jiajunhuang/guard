@@ -1,7 +1,9 @@
 package main
 
 import (
-	"net/http"
+	"log"
+
+	"github.com/valyala/fasthttp"
 )
 
 /*
@@ -34,5 +36,7 @@ func main() {
 
 	breaker.apps[appName].AddRoute("/", "GET")
 
-	http.ListenAndServe(":23456", breaker)
+	if err := fasthttp.ListenAndServe(":23456", breaker.ServeHTTP); err != nil {
+		log.Fatalf("error in fasthttp server: %s", err)
+	}
 }

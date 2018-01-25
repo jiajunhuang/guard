@@ -381,7 +381,7 @@ walk:
 			}
 		}
 
-		// nothing found
+		// nothing found, e.g. URL is `/user/jhon/card/`, but request `/user/jhon/card`
 		tsr = (path == "/") ||
 			(len(n.path) == len(path)+1 && n.path[len(path)] == '/' &&
 				path == n.path[:len(n.path)-1] && n.isLeaf)
