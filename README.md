@@ -1,4 +1,4 @@
-# guard
+# Guard
 
 [![Build Status](https://travis-ci.org/jiajunhuang/guard.svg?branch=master)](https://travis-ci.org/jiajunhuang/guard)
 [![codecov](https://codecov.io/gh/jiajunhuang/guard/branch/master/graph/badge.svg)](https://codecov.io/gh/jiajunhuang/guard)
@@ -11,15 +11,11 @@ guard is a generic high performance circuit breaker & proxy written in Go. It ha
 - circuit breaker: which make sure your backend services will not breakdown by a large quantity of requests
 - proxy server: it's based on fasthttp
 
-> radix tree is inspired by [httprouter](https://github.com/julienschmidt/httprouter), thanks!
-
-> proxy is based on [fasthttp](https://github.com/valyala/fasthttp), thanks!
-
-## workflow
+## Workflow
 
 ![workflow diagram](./workflow.png)
 
-## benchmark
+## Benchmark
 
 I've made a simple benchmark in my laptop(i5-3210M CPU @ 2.50GHz with 4 cores):
 
@@ -59,10 +55,10 @@ Transfer/sec:     17.72MB
 for now, guard's proxy performance is about ~~55% of Nginx~~ **1.76x** faster than Nginx,
 and **I'm still working on it! don't worry, it will become better and better!**
 
-~~by the way, thanks the [suggestion](https://github.com/jiajunhuang/guard/issues/15) 
+by the way, thanks ~~the [suggestion](https://github.com/jiajunhuang/guard/issues/15) 
 from [@dongzerun](https://github.com/dongzerun), by configure the `GOGC` in environment,
 guard's proxy performance is about 70% of Nginx.~~ guard do not allocate much memory now,
-`GOGC` does not make a change.
+`GOGC` does not make a change, but still say thanks to [@dongzerun](https://github.com/dongzerun)!
 
 ## TODO
 
@@ -72,14 +68,14 @@ guard's proxy performance is about 70% of Nginx.~~ guard do not allocate much me
 - [x] load balancer algorithm with round robin
 - [x] load balancer algorithm with random
 - [x] circuit breaker
-- [x] proxy server(thanks @[golang](https://golang.org/))
+- [x] proxy server(thanks @[fasthttp](https://github.com/valyala/fasthttp))
 - [ ] dynamic configuration load & save
 - [ ] graceful restart
 - [x] ~~URL-level mutex(remove the bucket-level mutex to gain a better performance)~~ the statistics module is lock-free now
 - [ ] fallback option while circuit breaker works(maybe serve a static html page, or return some words.)
 - [ ] more test cases & benchmarks
 
-## set it up
+## Set it up
 
 for now, it's a little bit inconvenient to setup, but here is the guide:
 
@@ -92,7 +88,7 @@ $ go get -u github.com/jiajunhuang/guard
 2. compile it
 
 ```bash
-$ $GOPATH/src/github.com/jiajunhuang/guard && make
+$ cd $GOPATH/src/github.com/jiajunhuang/guard && make
 ```
 
 3. start it
@@ -137,3 +133,18 @@ $ http :23456 'Host: www.example.com'
 HTTP/1.1 200 OK
 ...
 ```
+
+## Changelogs
+
+- 2018-01-25: rewrite proxy from `net/http` to `fasthttp`, it's super fast now!
+- 2018-01-24: rewrite radix tree & statistics module, it's lock-free now!
+- 2018-01-22: add randomized distribute, naive round robin algorithms
+- 2018-01-21: rewrite status statistics module
+- 2018-01-20: guard works!
+- 2018-01-19: first commit
+
+## Thanks
+
+- [Golang](https://golang.org)
+- [fasthttp](https://github.com/valyala/fasthttp)
+- [httprouter](https://github.com/jiajunhuang/httprouter)
