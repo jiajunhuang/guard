@@ -20,7 +20,7 @@ func TestStatusRing(t *testing.T) {
 
 func TestIncr(t *testing.T) {
 	n := &node{}
-	n.addRoute("/user/hello")
+	n.addRoute([]byte("/user/hello"))
 
 	n.incr(http.StatusOK)
 	n.incr(http.StatusTooManyRequests)
@@ -37,7 +37,7 @@ func TestBadIncrStatusIsNil(t *testing.T) {
 
 func TestQuery(t *testing.T) {
 	n := &node{}
-	n.addRoute("/user")
+	n.addRoute([]byte("/user"))
 
 	ok, too, internal, bad, _ := n.query()
 
@@ -90,7 +90,7 @@ func TestQueryNilStatus(t *testing.T) {
 
 func TestRefreshStatus(t *testing.T) {
 	n := &node{}
-	n.addRoute("/user/hello", GET)
+	n.addRoute([]byte("/user/hello"), GET)
 
 	status := n.status
 	now := RightNow()
@@ -112,7 +112,7 @@ func TestRefreshStatus(t *testing.T) {
 
 func TestRefreshStatusShouldNotRefresh(t *testing.T) {
 	n := &node{}
-	n.addRoute("/user/hello", GET)
+	n.addRoute([]byte("/user/hello"), GET)
 
 	now := RightNow()
 	status := n.status
@@ -126,7 +126,7 @@ func TestRefreshStatusShouldNotRefresh(t *testing.T) {
 // benchmark
 func BenchmarkIncr(b *testing.B) {
 	n := &node{}
-	n.addRoute("/user/hello")
+	n.addRoute([]byte("/user/hello"))
 
 	for i := 0; i < b.N; i++ {
 		n.incr(http.StatusBadGateway)
@@ -135,7 +135,7 @@ func BenchmarkIncr(b *testing.B) {
 
 func BenchmarkQuery(b *testing.B) {
 	n := &node{}
-	n.addRoute("/user/hello")
+	n.addRoute([]byte("/user/hello"))
 
 	for i := 0; i < 100; i++ {
 		n.incr(http.StatusBadGateway)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"log"
 )
 
@@ -63,13 +64,13 @@ const (
 // radix tree is "read only" after constructed. which means, it's not read only
 // but I assume it is...
 type node struct {
-	path  string   // common prefix of childs
+	path  []byte   // common prefix of childs
 	nType nodeType // node type, static, root, param, or catchAll
 	// supported HTTP methods, for decide raise a `405 Method Not Allowd` or not,
 	// if a method is support, the correspoding bit is set
 	methods   HTTPMethod
 	wildChild bool    // child type is param, or catchAll
-	indices   string  // first letter of childs, it's index for binary search.
+	indices   []byte  // first letter of childs, it's index for binary search.
 	children  []*node // childrens
 	isLeaf    bool    // if it's a leaf
 	status    *Status // if it's a leaf, it should have a ring of `Status` struct
@@ -96,11 +97,11 @@ func (n *node) hasMethod(method HTTPMethod) bool {
 
 // addRoute adds a node with given path, handle all the resource with it.
 // if it's a leaf, it should have a ring of `Status`.
-func (n *node) addRoute(path string, methods ...HTTPMethod) {
+func (n *node) addRoute(path []byte, methods ...HTTPMethod) {
 	fullPath := path
 
 	/* tree is empty */
-	if n.path == "" && len(n.children) == 0 {
+	if len(n.path) == 0 && len(n.children) == 0 {
 		n.nType = root
 		// reset these properties
 		n.isLeaf = false
@@ -140,7 +141,7 @@ walk:
 			n.isLeaf = false
 			n.status = nil
 			n.children = []*node{&child}
-			n.indices = string([]byte{n.path[i]})
+			n.indices = []byte{n.path[i]}
 			n.path = path[:i]
 			n.wildChild = false
 		}
@@ -163,7 +164,7 @@ walk:
 			// only thses two cases are permit, panic if not
 			lenNode := len(n.path)
 			lenPath := len(path)
-			if lenPath >= lenNode && n.path == path[:lenNode] &&
+			if lenPath >= lenNode && bytes.Equal(n.path, path[:lenNode]) &&
 				// Check for longer wildcard, e.g. :name and :names
 				(lenNode >= lenPath || path[lenNode] == '/') {
 				continue walk
@@ -193,7 +194,7 @@ walk:
 
 		// insert it!
 		if c != ':' && c != '*' {
-			n.indices += string([]byte{c})
+			n.indices = append(n.indices, c)
 			child := &node{}
 			n.children = append(n.children, child)
 			n = child
@@ -202,7 +203,7 @@ walk:
 	}
 }
 
-func (n *node) insertChild(path string, fullPath string, methods ...HTTPMethod) {
+func (n *node) insertChild(path []byte, fullPath []byte, methods ...HTTPMethod) {
 	var offset int // bytes in the path have already handled
 	var numParams uint8
 	var maxLen = len(path)
@@ -299,11 +300,11 @@ func (n *node) insertChild(path string, fullPath string, methods ...HTTPMethod) 
 }
 
 // byPath return a node with the given path
-func (n *node) byPath(path string) (nd *node, tsr bool, found bool) {
+func (n *node) byPath(path []byte) (nd *node, tsr bool, found bool) {
 walk:
 	for {
 		if len(path) > len(n.path) {
-			if path[:len(n.path)] == n.path {
+			if bytes.Equal(path[:len(n.path)], n.path) {
 				path = path[len(n.path):]
 				// if this node does not have a wildcard(param or catchAll) child, we can just look up
 				// the next child node and continue to walk down the tree
@@ -320,7 +321,7 @@ walk:
 					// nothing found
 					// we can recommend to redirect to the same URL without a trailing slash if a leaf
 					// exists for that path
-					tsr = (path == "/" && n.isLeaf)
+					tsr = (bytes.Equal(path, []byte("/")) && n.isLeaf)
 					return nil, tsr, false
 				}
 
@@ -352,7 +353,7 @@ walk:
 						return n, false, true
 					}
 
-					tsr = len(n.children) == 1 && n.children[0].isLeaf && n.children[0].path == "/"
+					tsr = len(n.children) == 1 && n.children[0].isLeaf && bytes.Equal(n.children[0].path, []byte("/"))
 					return nil, tsr, false
 				case catchAll:
 					return n, false, true
@@ -360,7 +361,7 @@ walk:
 					log.Panicf("invalid node type: %+v", n)
 				}
 			}
-		} else if path == n.path {
+		} else if bytes.Equal(path, n.path) {
 			if n.isLeaf {
 				return n, false, true
 			}
@@ -382,9 +383,9 @@ walk:
 		}
 
 		// nothing found, e.g. URL is `/user/jhon/card/`, but request `/user/jhon/card`
-		tsr = (path == "/") ||
+		tsr = (bytes.Equal(path, []byte("/"))) ||
 			(len(n.path) == len(path)+1 && n.path[len(path)] == '/' &&
-				path == n.path[:len(n.path)-1] && n.isLeaf)
+				bytes.Equal(path, n.path[:len(n.path)-1]) && n.isLeaf)
 		return nil, tsr, false
 	}
 }
