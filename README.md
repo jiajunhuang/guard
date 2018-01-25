@@ -69,7 +69,7 @@ guard's proxy performance is about 70% of Nginx.~~ guard do not allocate much me
 - [x] load balancer algorithm with random
 - [x] circuit breaker
 - [x] proxy server(thanks @[fasthttp](https://github.com/valyala/fasthttp))
-- [ ] dynamic configuration load & save
+- [x] dynamic configuration load & save
 - [ ] graceful restart
 - [x] ~~URL-level mutex(remove the bucket-level mutex to gain a better performance)~~ the statistics module is lock-free now
 - [ ] fallback option while circuit breaker works(maybe serve a static html page, or return some words.)
