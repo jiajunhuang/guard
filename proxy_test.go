@@ -16,7 +16,7 @@ var fakeBackend = Backend{}
 
 func setFakeBackend(url string, weight int) {
 	fakeBackend.Weight = weight
-	fakeBackend.url = url
+	fakeBackend.URL = url
 	fakeBackend.client = &fasthttp.HostClient{Addr: url, MaxConns: fasthttp.DefaultMaxConnsPerHost}
 }
 

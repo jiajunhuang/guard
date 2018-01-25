@@ -7,12 +7,12 @@ import (
 
 func TestWRRFound(t *testing.T) {
 	// weights of [5, 1, 1] should generate sequence of index: [1, 1, 2, 1, 3, 1, 1]
-	h1 := "192.168.1.1"
-	h2 := "192.168.1.2"
-	h3 := "192.168.1.3"
-	b1 := NewBackend(h1, "80", 5)
-	b2 := NewBackend(h2, "80", 1)
-	b3 := NewBackend(h3, "80", 1)
+	h1 := "192.168.1.1:80"
+	h2 := "192.168.1.2:80"
+	h3 := "192.168.1.3:80"
+	b1 := NewBackend(h1, 5)
+	b2 := NewBackend(h2, 1)
+	b3 := NewBackend(h3, 1)
 
 	wrr := NewWRR(b1, b2, b3)
 
@@ -35,8 +35,8 @@ func TestWRRFound(t *testing.T) {
 
 	for i, e := range expectResultList {
 		r, f = wrr.Select()
-		if f != e.found || r.Host != e.host {
-			t.Errorf("the %dth select should found the %s, but got: %+v, %t", i, e.host, r.Host, f)
+		if f != e.found || r.URL != e.host {
+			t.Errorf("the %dth select should found the %s, but got: %+v, %t", i, e.host, r.URL, f)
 		}
 		wrr.lock.Lock()
 		if !reflect.DeepEqual(wrr.weights, e.shouldBe) {
@@ -47,12 +47,12 @@ func TestWRRFound(t *testing.T) {
 }
 
 func TestWRRNotFound(t *testing.T) {
-	h1 := "192.168.1.1"
-	h2 := "192.168.1.2"
-	h3 := "192.168.1.3"
-	b1 := NewBackend(h1, "80", 0)
-	b2 := NewBackend(h2, "80", 0)
-	b3 := NewBackend(h3, "80", 0)
+	h1 := "192.168.1.1:80"
+	h2 := "192.168.1.2:80"
+	h3 := "192.168.1.3:80"
+	b1 := NewBackend(h1, 0)
+	b2 := NewBackend(h2, 0)
+	b3 := NewBackend(h3, 0)
 
 	wrr := NewWRR(b1, b2, b3)
 
@@ -76,7 +76,7 @@ func TestWRRNotFound(t *testing.T) {
 	for i, e := range expectResultList {
 		r, f = wrr.Select()
 		if f != e.found || r != e.backend {
-			t.Errorf("the %dth select should found the %+v, but got: %+v, %t", i, e.backend, r.Host, f)
+			t.Errorf("the %dth select should found the %+v, but got: %+v, %t", i, e.backend, r.URL, f)
 		}
 		wrr.lock.Lock()
 		if !reflect.DeepEqual(wrr.weights, e.shouldBe) {
@@ -87,12 +87,12 @@ func TestWRRNotFound(t *testing.T) {
 }
 
 func BenchmarkWRRSelect(b *testing.B) {
-	h1 := "192.168.1.1"
-	h2 := "192.168.1.2"
-	h3 := "192.168.1.3"
-	b1 := NewBackend(h1, "80", 5)
-	b2 := NewBackend(h2, "80", 1)
-	b3 := NewBackend(h3, "80", 1)
+	h1 := "192.168.1.1:80"
+	h2 := "192.168.1.2:80"
+	h3 := "192.168.1.3:80"
+	b1 := NewBackend(h1, 5)
+	b2 := NewBackend(h2, 1)
+	b3 := NewBackend(h3, 1)
 
 	wrr := NewWRR(b1, b2, b3)
 
