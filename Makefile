@@ -2,7 +2,7 @@
 
 COVERPROFILE=
 DEBUG=
-ARGS=
+ARGS=-args -configPath=/tmp/guard.test.json -configAddr=":34567" -proxyAddr=":45678"
 
 build: clean fmt vet test
 	go build

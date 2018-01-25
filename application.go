@@ -57,7 +57,7 @@ func convertMethod(methods ...string) HTTPMethod {
 
 // AddRoute add a route to itself
 func (a *Application) AddRoute(path string, methods ...string) {
-	a.root.addRoute(path, convertMethod(methods...))
+	a.root.addRoute([]byte(path), convertMethod(methods...))
 }
 
 func (a *Application) ServeHTTP(ctx *fasthttp.RequestCtx) {
@@ -68,7 +68,7 @@ func (a *Application) ServeHTTP(ctx *fasthttp.RequestCtx) {
 		log.Panic("application should bind a load balancer")
 	}
 
-	path := string(ctx.Path())
+	path := ctx.Path()
 	n, tsr, found := a.root.byPath(path)
 
 	// redirect?
@@ -78,14 +78,14 @@ func (a *Application) ServeHTTP(ctx *fasthttp.RequestCtx) {
 			code = fasthttp.StatusTemporaryRedirect
 		}
 
-		var redirectTo string
+		var redirectTo []byte
 		if len(path) > 1 && path[len(path)-1] == '/' {
 			redirectTo = path[:len(path)-1]
 		} else {
-			redirectTo = path + "/"
+			redirectTo = append(path, '/')
 		}
 		log.Printf("redirect to %s", redirectTo)
-		ctx.Redirect(redirectTo, code)
+		ctx.RedirectBytes(redirectTo, code)
 		return
 	}
 
