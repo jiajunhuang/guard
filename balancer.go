@@ -5,21 +5,23 @@ import (
 )
 
 // load balancer: return which backend should we proxy to
+const (
+	LBMWRR    = "wrr"
+	LBMRR     = "rr"
+	LBMRandom = "random"
+)
 
 // Backend is the backend server, usally a app server like: gunicorn+flask
 type Backend struct {
-	Host   string `json:"host"`
-	Port   string `json:"port"`
-	Weight int    `json:"weight"`
-	url    string // cache the result
+	Weight int
+	URL    string // cache the result
 	client *fasthttp.HostClient
 }
 
 // NewBackend return a new backend
-func NewBackend(host string, port string, weight int) Backend {
-	url := host + ":" + port
+func NewBackend(url string, weight int) Backend {
 	return Backend{
-		host, port, weight, url,
+		weight, url,
 		&fasthttp.HostClient{Addr: url, MaxConns: fasthttp.DefaultMaxConnsPerHost * 4},
 	}
 }
