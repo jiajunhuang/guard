@@ -172,7 +172,7 @@ After=network.target
 Type=simple
 User=root
 Environment=GOMAXPROCS=2
-LimitNOFILE=4096000
+LimitNOFILE=204800
 WorkingDirectory=/usr/local/bin/
 ExecStart=/usr/local/bin/guard
 Restart=on-abort
