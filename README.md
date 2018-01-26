@@ -4,11 +4,11 @@
 [![codecov](https://codecov.io/gh/jiajunhuang/guard/branch/master/graph/badge.svg)](https://codecov.io/gh/jiajunhuang/guard)
 ![GoReport](https://goreportcard.com/badge/github.com/jiajunhuang/guard)
 
-guard is a generic high performance circuit breaker & proxy written in Go. It has four major component:
+guard is a generic high performance circuit breaker & proxy written in Go. It has four major components:
 
-- radix tree & response status ring: which stores registed URLs
+- radix tree & response status ring: which stores registered URLs
 - load balancer: which distributes requests(algorithms: randomized distribute, round robin, weighted round robin)
-- circuit breaker: which make sure your backend services will not breakdown by a large quantity of requests
+- circuit breaker: which makes sure your backend services will not be broken down by a large quantity of requests
 - proxy server: it's based on fasthttp
 
 ## Workflow
@@ -17,7 +17,7 @@ guard is a generic high performance circuit breaker & proxy written in Go. It ha
 
 ## Benchmark
 
-I've made a simple benchmark in my laptop(i5-3210M CPU @ 2.50GHz with 4 cores):
+I've made a simple benchmark on my laptop(i5-3210M CPU @ 2.50GHz with 4 cores):
 
 ```bash
 $ wrk --latency -H "Host: www.example.com" -c 2048 -d 30 -t 2 http://127.0.0.1:9999  # Nginx with 4 workers
@@ -52,12 +52,12 @@ Requests/sec:  22494.06
 Transfer/sec:     17.72MB
 ```
 
-for now, guard's proxy performance is about ~~55% of Nginx~~ **1.76x** faster than Nginx,
-and **I'm still working on it! don't worry, it will become better and better!**
+For now, guard's proxy performance is about ~~55% of Nginx~~ **1.76x** faster than Nginx,
+and **I'm still working on it! Don't worry, it will become better and better!**
 
-by the way, thanks ~~the [suggestion](https://github.com/jiajunhuang/guard/issues/15) 
+By the way, ~~thanks the [suggestion](https://github.com/jiajunhuang/guard/issues/15) 
 from [@dongzerun](https://github.com/dongzerun), by configure the `GOGC` in environment,
-guard's proxy performance is about 70% of Nginx.~~ guard do not allocate much memory now,
+guard's proxy performance is about 70% of Nginx.~~ guard does not allocate much memory now,
 `GOGC` does not make a change, but still say thanks to [@dongzerun](https://github.com/dongzerun)!
 
 ## TODO
@@ -77,27 +77,19 @@ guard's proxy performance is about 70% of Nginx.~~ guard do not allocate much me
 
 ## Set it up
 
-for now, it's a little bit inconvenient to setup, but here is the guide:
-
-1. clone the source code using `go get -u`:
+1. build it using `go get -u`:
 
 ```bash
 $ go get -u github.com/jiajunhuang/guard
 ```
 
-2. compile it
+2. start it
 
 ```bash
-$ cd $GOPATH/src/github.com/jiajunhuang/guard && make
+$ guard
 ```
 
-3. start it
-
-```bash
-$ ./guard
-```
-
-4. now you need to register an application by send a POST request to `http://127.0.0.1:12345/app` with json like this:
+3. now you need to register an application by send a POST request to `http://127.0.0.1:12345/app` with json like this:
 
 ```json
 {
@@ -122,7 +114,7 @@ Date: Sun, 21 Jan 2018 08:51:16 GMT
 success!
 ```
 
-5. and now, it works! whoops! try it:
+4. and now, it works! whoops! try it:
 
 ```bash
 $ http :23456 'Host: www.example.com'
