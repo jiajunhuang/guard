@@ -15,3 +15,8 @@
 
 # binarys
 guard
+guard.linux_386
+guard.linux_amd64
+guard.macos_amd64
+guard.windows_386.exe
+guard.windows_amd64.exe

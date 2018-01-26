@@ -30,3 +30,6 @@ cover:
 
 profiling:
 	go test -bench=. -cpuprofile cpu.out -memprofile mem.out $(ARGS)
+
+release: clean fmt vet test
+	GOOS=linux GOARCH=amd64 go build -o guard.linux_amd64
