@@ -2,11 +2,16 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
+)
+
+var (
+	badJSON    = `"name":"www.example.com","backends":["127.0.0.1:80","127.0.0.1:80","127.0.0.1:80"],"weights":[5,1],"ratio":0.3,"paths":["/"],"methods":["GET"]}`
+	badConfig  = `{"name":"www.example.com","backends":["127.0.0.1:80","127.0.0.1:80","127.0.0.1:80"],"weights":[5,1],"ratio":0.3,"paths":["/"],"methods":["GET"]}`
+	goodConfig = `{"name":"www.example.com","backends":["127.0.0.1:80","127.0.0.1:80","127.0.0.1:80"],"weights":[5,1,1],"ratio":0.3,"paths":["/"],"methods":["GET"]}`
 )
 
 func TestUpdateConfig(t *testing.T) {
@@ -16,9 +21,6 @@ func TestUpdateConfig(t *testing.T) {
 	defer fakeServer.Close()
 
 	url := fakeServer.URL + "/app"
-	badJSON := `"name":"www.example.com","backends":["127.0.0.1:80","127.0.0.1:80","127.0.0.1:80"],"weights":[5,1],"ratio":0.3,"paths":["/"],"methods":["GET"]}`
-	badConfig := `{"name":"www.example.com","backends":["127.0.0.1:80","127.0.0.1:80","127.0.0.1:80"],"weights":[5,1],"ratio":0.3,"paths":["/"],"methods":["GET"]}`
-	goodConfig := `{"name":"www.example.com","backends":["127.0.0.1:80","127.0.0.1:80","127.0.0.1:80"],"weights":[5,1,1],"ratio":0.3,"paths":["/"],"methods":["GET"]}`
 
 	// try get
 	resp, err := http.Get(url)
@@ -96,7 +98,7 @@ func TestReadFromFile(t *testing.T) {
 	content := []byte("hello world")
 	f.Write(content)
 
-	readContent := readFromFile(*configPath)
+	readContent, _ := readFromFile(*configPath)
 	if !bytes.Equal(readContent, content) {
 		t.Errorf("read from file return bad content: %s", string(readContent))
 	}
@@ -143,28 +145,38 @@ func TestConfigKeeperGoodJSON(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed to open config file: %s", err)
 	}
-	config := appConfig{
-		"www.example.com",
-		[]string{"192.168.1.1:80"},
-		[]int{1},
-		0.3,
-		false,
-		LBMWRR,
-		[]string{"/"},
-		[]string{"GET"},
-	}
-	breakerConfig := make(map[string]appConfig)
-	breakerConfig[config.Name] = config
-	fileBytes, err := json.Marshal(breakerConfig)
-	if err != nil {
-		t.Errorf("failed to marshal breaker config: %s", err)
-	}
 	f.Truncate(0)
 	f.Seek(0, 0)
-	f.Write(fileBytes)
+	f.Write([]byte(goodConfig))
 	f.Close()
 
 	go configKeeper()
 
 	close(configSync)
+}
+
+func TestConfigIndex(t *testing.T) {
+	fakeServer := httptest.NewServer(
+		http.HandlerFunc(configIndexHandler),
+	)
+	defer fakeServer.Close()
+	url := fakeServer.URL + "/"
+
+	// test 200
+	f, err := os.OpenFile(*configPath, os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		t.Errorf("failed to open config file: %s", err)
+	}
+	f.Truncate(0)
+	f.Seek(0, 0)
+	f.Write([]byte(goodConfig))
+	f.Close()
+
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Errorf("failed to get config index page")
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("should got 200, but: %d", resp.StatusCode)
+	}
 }

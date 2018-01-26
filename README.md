@@ -35,7 +35,8 @@ Running 30s test @ http://127.0.0.1:9999
   Socket errors: connect 1029, read 0, write 0, timeout 114
 Requests/sec:  12749.73                           
 Transfer/sec:     10.33MB                         
-$ wrk --latency -H "Host: www.example.com" -c 2048 -d 30 -t 2 http://127.0.0.1:23456  # guard
+
+$ wrk --latency -H "Host: www.example.com" -c 2048 -d 30 -t 2 http://127.0.0.1:23456  # guard with GOMAXPROCS=4
 Running 30s test @ http://127.0.0.1:23456
   2 threads and 2048 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
@@ -120,6 +121,45 @@ success!
 $ http :23456 'Host: www.example.com'
 HTTP/1.1 200 OK
 ...
+```
+
+5. by the way, you can inspect your configuration by visit http://127.0.0.1:12345/ :
+
+```bash
+http :12345
+HTTP/1.1 200 OK
+Content-Length: 235
+Content-Type: application/json
+Date: Fri, 26 Jan 2018 14:11:02 GMT
+
+{
+    "apps": {
+        "www.example.com": {
+            "backends": [
+                "127.0.0.1:80",
+                "127.0.0.1:80",
+                "127.0.0.1:80"
+            ],
+            "disable_tsr": false,
+            "load_balance_method": "rr",
+            "methods": [
+                "GET",
+                "GET"
+            ],
+            "name": "www.example.com",
+            "paths": [
+                "/",
+                "/doc"
+            ],
+            "ratio": 0.3,
+            "weights": [
+                5,
+                1,
+                1
+            ]
+        }
+    }
+}
 ```
 
 ## Changelogs
