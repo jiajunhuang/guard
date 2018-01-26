@@ -17,7 +17,7 @@ vet:
 	go tool vet -v .
 
 test:
-	go test -cover $(COVERPROFILE) -race $(DEBUG)
+	go test -cover $(COVERPROFILE) -race $(DEBUG) $(ARGS)
 
 bench:
 	go test -bench=. -benchmem $(ARGS)

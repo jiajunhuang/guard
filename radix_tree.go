@@ -64,8 +64,9 @@ const (
 // radix tree is "read only" after constructed. which means, it's not read only
 // but I assume it is...
 type node struct {
-	path  []byte   // common prefix of childs
-	nType nodeType // node type, static, root, param, or catchAll
+	noCopy noCopy
+	path   []byte   // common prefix of childs
+	nType  nodeType // node type, static, root, param, or catchAll
 	// supported HTTP methods, for decide raise a `405 Method Not Allowd` or not,
 	// if a method is support, the correspoding bit is set
 	methods   HTTPMethod
