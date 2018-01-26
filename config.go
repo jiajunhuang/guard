@@ -116,37 +116,29 @@ func appHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("success!"))
 }
 
-func configManager() {
-	go configKeeper()
-	http.HandleFunc("/app", appHandler)
-	log.Fatal(http.ListenAndServe(*configAddr, nil))
-}
-
 type breakerConfig struct {
 	APPs map[string]appConfig `json:"apps"`
 }
 
-func readFromFile(path string) []byte {
+func readFromFile(path string) ([]byte, error) {
 	f, err := os.OpenFile(*configPath, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
-		log.Panicf("failed to open config file: %s", err)
+		return nil, err
 	}
 	defer f.Close()
 
-	fileBytes, err := ioutil.ReadAll(f)
-	if err != nil {
-		log.Panicf("failed to read file: %s", err)
-	}
-
-	return fileBytes
+	return ioutil.ReadAll(f)
 }
 
 func configKeeper() {
 	// first try to load config
 	b := breakerConfig{make(map[string](appConfig))}
 
-	fileBytes := readFromFile(*configPath)
-	if err := json.Unmarshal(fileBytes, &b); err == nil && len(b.APPs) > 0 {
+	fileBytes, err := readFromFile(*configPath)
+	if err != nil {
+		log.Panicf("failed to use config file %s: %s", *configPath, err)
+	}
+	if err := json.Unmarshal(fileBytes, &b); err == nil {
 		log.Printf("loading config from config file")
 		for k, v := range b.APPs {
 			breaker.apps[k] = getAPP(&v)
@@ -191,4 +183,21 @@ func configKeeper() {
 	}
 
 	log.Printf("stop sync config file")
+}
+
+func configIndexHandler(w http.ResponseWriter, r *http.Request) {
+	if fileBytes, err := readFromFile(*configPath); err != nil {
+		log.Printf("failed to read from %s: %s", *configPath, err)
+		w.WriteHeader(http.StatusInternalServerError)
+	} else {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(fileBytes)
+	}
+}
+
+func configManager() {
+	go configKeeper()
+	http.HandleFunc("/app", appHandler)
+	http.HandleFunc("/", configIndexHandler)
+	log.Fatal(http.ListenAndServe(*configAddr, nil))
 }
