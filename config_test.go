@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 )
 
@@ -80,4 +82,89 @@ func TestGetBalancer(t *testing.T) {
 
 	defer shouldPanic()
 	getBalancer("what")
+}
+
+func TestReadFromFile(t *testing.T) {
+	os.Remove(*configPath)
+	defer os.Remove(*configPath)
+
+	f, err := os.OpenFile(*configPath, os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		t.Errorf("failed to open config file: %s", err)
+	}
+	defer f.Close()
+	content := []byte("hello world")
+	f.Write(content)
+
+	readContent := readFromFile(*configPath)
+	if !bytes.Equal(readContent, content) {
+		t.Errorf("read from file return bad content: %s", string(readContent))
+	}
+}
+
+func TestConfigKeeper(t *testing.T) {
+	os.Remove(*configPath)
+	defer os.Remove(*configPath)
+
+	config := appConfig{
+		"www.example.com",
+		[]string{"192.168.1.1:80"},
+		[]int{1},
+		0.3,
+		false,
+		LBMWRR,
+		[]string{"/"},
+		[]string{"GET"},
+	}
+
+	go configKeeper()
+
+	configSync <- config
+}
+
+func TestConfigKeeperBadJSON(t *testing.T) {
+	os.Remove(*configPath)
+	defer os.Remove(*configPath)
+	f, err := os.OpenFile(*configPath, os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		t.Errorf("failed to open config file: %s", err)
+	}
+	defer f.Close()
+	content := []byte("hello world")
+	f.Write(content)
+
+	go configKeeper()
+}
+
+func TestConfigKeeperGoodJSON(t *testing.T) {
+	os.Remove(*configPath)
+	//defer os.Remove(*configPath)
+	f, err := os.OpenFile(*configPath, os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		t.Errorf("failed to open config file: %s", err)
+	}
+	config := appConfig{
+		"www.example.com",
+		[]string{"192.168.1.1:80"},
+		[]int{1},
+		0.3,
+		false,
+		LBMWRR,
+		[]string{"/"},
+		[]string{"GET"},
+	}
+	breakerConfig := make(map[string]appConfig)
+	breakerConfig[config.Name] = config
+	fileBytes, err := json.Marshal(breakerConfig)
+	if err != nil {
+		t.Errorf("failed to marshal breaker config: %s", err)
+	}
+	f.Truncate(0)
+	f.Seek(0, 0)
+	f.Write(fileBytes)
+	f.Close()
+
+	go configKeeper()
+
+	close(configSync)
 }

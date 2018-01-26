@@ -11,7 +11,7 @@ const (
 	LBMRandom = "random"
 )
 
-// Backend is the backend server, usally a app server like: gunicorn+flask
+// Backend is the backend server, usually a app server like: gunicorn+flask
 type Backend struct {
 	Weight int
 	URL    string // cache the result
