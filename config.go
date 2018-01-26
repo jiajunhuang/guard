@@ -146,15 +146,13 @@ func configKeeper() {
 	b := breakerConfig{make(map[string](appConfig))}
 
 	fileBytes := readFromFile(*configPath)
-	if err := json.Unmarshal(fileBytes, &b); err != nil && len(fileBytes) > 0 {
-		log.Printf("failed to unmarshal config file %s because %s", *configPath, err)
-	}
-
-	if len(b.APPs) > 0 {
+	if err := json.Unmarshal(fileBytes, &b); err == nil && len(b.APPs) > 0 {
 		log.Printf("loading config from config file")
 		for k, v := range b.APPs {
 			breaker.apps[k] = getAPP(&v)
 		}
+	} else {
+		log.Printf("failed to unmarshal config file %s because %s", *configPath, err)
 	}
 
 	// listen channel for sync
