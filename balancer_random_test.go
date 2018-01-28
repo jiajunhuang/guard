@@ -16,6 +16,13 @@ func TestRandomBalancer(t *testing.T) {
 		t.Error("no backend should found!")
 	}
 
+	// one backend
+	balancer = NewRdm(b1)
+	_, found = balancer.Select()
+	if !found {
+		t.Error("one backend should found!")
+	}
+
 	balancer = NewRdm(b1, b2, b3)
 	_, found = balancer.Select()
 	if !found {

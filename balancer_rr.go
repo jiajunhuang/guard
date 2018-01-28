@@ -16,10 +16,12 @@ func NewRR(backends ...Backend) *RR {
 }
 
 // Select return a backend randomly
-func (r *RR) Select() (*Backend, bool) {
+func (r *RR) Select() (b *Backend, found bool) {
 	length := uint64(len(r.upstream))
 	if length == 0 {
 		return nil, false
+	} else if length == 1 {
+		return &r.upstream[0], true
 	}
 
 	// TODO: shuold we check for overflow?

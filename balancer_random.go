@@ -19,6 +19,8 @@ func (r *Rdm) Select() (*Backend, bool) {
 	length := len(r.upstream)
 	if length == 0 {
 		return nil, false
+	} else if length == 1 {
+		return &r.upstream[0], true
 	}
 
 	return &(r.upstream[rand.Int()%length]), true

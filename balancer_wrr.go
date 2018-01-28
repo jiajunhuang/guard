@@ -30,6 +30,13 @@ func NewWRR(backends ...Backend) *WRR {
 // for example, weights of [5, 1, 1] should generate sequence of index:
 // [1, 1, 2, 1, 3, 1, 1]
 func (w *WRR) Select() (b *Backend, found bool) {
+	length := uint64(len(w.upstream))
+	if length == 0 {
+		return nil, false
+	} else if length == 1 {
+		return &w.upstream[0], true
+	}
+
 	w.lock.Lock()
 
 	totalWeight := w.totalWeight
