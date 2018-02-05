@@ -75,6 +75,86 @@ func TestCheckAPPConfig(t *testing.T) {
 	if err := checkAppConfig(config); err == nil {
 		t.Errorf("should return error but not")
 	}
+
+	// check fallback
+	config.Name = "www.example.com"
+	config.Backends = []string{"192.168.1.1:80"}
+	config.Weights = []int{1}
+	config.Ratio = 0.3
+	config.DisableTSR = false
+	config.LoadBalanceMethod = LBMWRR
+	config.Paths = []string{"/"}
+	config.Methods = []string{"get"}
+
+	// "" or text
+	config.FallbackType = ""
+	content := "too many requests"
+	if err := checkAppConfig(config); err != nil {
+		t.Errorf("should not return error but got: %s", err)
+	}
+	if config.FallbackType != fallbackTEXT || config.FallbackContent != content {
+		t.Errorf("fallback options error: %s, %s", config.FallbackType, config.FallbackContent)
+	}
+	config.FallbackType = fallbackTEXT
+	if err := checkAppConfig(config); err != nil {
+		t.Errorf("should not return error but got: %s", err)
+	}
+	if config.FallbackType != fallbackTEXT || config.FallbackContent != content {
+		t.Errorf("fallback options error: %s, %s", config.FallbackType, config.FallbackContent)
+	}
+
+	// "json"
+	config.FallbackType = fallbackJSON
+	content = "{}"
+	config.FallbackContent = content
+	if err := checkAppConfig(config); err != nil {
+		t.Errorf("should not return error but got: %s", err)
+	}
+	if config.FallbackType != fallbackJSON || config.FallbackContent != content {
+		t.Errorf("fallback options error: %s, %s", config.FallbackType, config.FallbackContent)
+	}
+
+	// "html"
+	config.FallbackType = fallbackHTML
+	content = "<html></html>"
+	config.FallbackContent = content
+	if err := checkAppConfig(config); err != nil {
+		t.Errorf("should not return error but got: %s", err)
+	}
+	if config.FallbackType != fallbackHTML || config.FallbackContent != content {
+		t.Errorf("fallback options error: %s, %s", config.FallbackType, config.FallbackContent)
+	}
+
+	// "html_file"
+	// file not exist
+	filePath := "/tmp/test_guard_html_file_path.html"
+	os.Remove(filePath)
+	config.FallbackType = fallbackHTMLFile
+	config.FallbackContent = filePath
+	if err := checkAppConfig(config); err == nil {
+		t.Errorf("should return error but not")
+	}
+
+	// file exists
+	f, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		t.Errorf("failed to open %s: %s", filePath, err)
+	}
+	defer f.Close()
+	content = "<html></html>"
+	f.Write([]byte(content))
+	if err := checkAppConfig(config); err != nil {
+		t.Errorf("should not return error, but got: %s", err)
+	}
+	if config.FallbackType != fallbackHTML || config.FallbackContent != content {
+		t.Errorf("fallback options error: %s, %s", config.FallbackType, config.FallbackContent)
+	}
+
+	// bad type
+	config.FallbackType = "what"
+	if err := checkAppConfig(config); err == nil {
+		t.Errorf("should return error but not")
+	}
 }
 
 func TestGetBalancer(t *testing.T) {
@@ -117,6 +197,8 @@ func TestConfigKeeper(t *testing.T) {
 		LBMWRR,
 		[]string{"/"},
 		[]string{"GET"},
+		"",
+		"too many requests",
 	}
 
 	go configKeeper()

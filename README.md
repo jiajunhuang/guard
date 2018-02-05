@@ -73,7 +73,7 @@ guard's proxy performance is about 70% of Nginx.~~ guard does not allocate much 
 - [x] dynamic configuration load & save
 - [ ] graceful restart
 - [x] ~~URL-level mutex(remove the bucket-level mutex to gain a better performance)~~ the statistics module is lock-free now
-- [ ] fallback option while circuit breaker works(maybe serve a static html page, or return some words.)
+- [x] fallback option while circuit breaker works(maybe serve a static html page, or return some words.)
 - [ ] more test cases & benchmarks
 
 ## Set it up
