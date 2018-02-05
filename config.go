@@ -10,11 +10,19 @@ import (
 	"strings"
 )
 
+const (
+	fallbackTEXT     = "text"
+	fallbackJSON     = "json"
+	fallbackHTML     = "html"
+	fallbackHTMLFile = "html_file"
+)
+
 var (
 	errNameEmpty               = errors.New("name is required")
 	errBackendWeightNotMatch   = errors.New("backend and weight does not match")
 	errPathMethodNotMatch      = errors.New("path and method does not match")
 	errBadLoadBalanceAlgorithm = errors.New("bad load balance algorithm, only wrr, rr, random are support now")
+	errBadFallbackType         = errors.New("bad fallback type")
 
 	configSync = make(chan appConfig)
 )
@@ -28,6 +36,8 @@ type appConfig struct {
 	LoadBalanceMethod string   `json:"load_balance_method"` // wrr, rr, random
 	Paths             []string `json:"paths"`
 	Methods           []string `json:"methods"`
+	FallbackType      string   `json:"fallback_type"`
+	FallbackContent   []byte   `json:"fallback_content"`
 }
 
 func checkAppConfig(a *appConfig) error {
@@ -46,6 +56,25 @@ func checkAppConfig(a *appConfig) error {
 	if a.LoadBalanceMethod == "" {
 		a.LoadBalanceMethod = "rr"
 		log.Printf("by default, app %s are using %s as load balance algorithm", a.Name, a.LoadBalanceMethod)
+	}
+
+	switch a.FallbackType {
+	case "", fallbackTEXT:
+		a.FallbackType = fallbackTEXT
+		if len(a.FallbackContent) == 0 {
+			a.FallbackContent = []byte("too many requests")
+		}
+	case fallbackJSON, fallbackHTML:
+
+	case fallbackHTMLFile:
+		html, err := ioutil.ReadFile(string(a.FallbackContent))
+		if err != nil {
+			return err
+		}
+		a.FallbackType = fallbackHTML
+		a.FallbackContent = html
+	default:
+		return errBadFallbackType
 	}
 
 	switch a.LoadBalanceMethod {
@@ -83,6 +112,9 @@ func getAPP(config *appConfig) *Application {
 	for i, path := range config.Paths {
 		app.AddRoute(path, strings.ToUpper(config.Methods[i]))
 	}
+
+	app.fallbackType = config.FallbackType
+	app.FallbackContent = config.FallbackContent
 
 	return app
 }

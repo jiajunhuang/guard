@@ -11,13 +11,15 @@ type Application struct {
 	// redirect if tsr is true?
 	TSRRedirect bool
 
-	balancer Balancer
-	root     *node
+	balancer        Balancer
+	root            *node
+	fallbackType    string
+	FallbackContent []byte
 }
 
 // NewApp return a brand new Application
 func NewApp(b Balancer, tsr bool) *Application {
-	return &Application{tsr, b, &node{}}
+	return &Application{tsr, b, &node{}, "", []byte("")}
 }
 
 func convertMethod(methods ...string) HTTPMethod {
@@ -104,8 +106,21 @@ func (a *Application) ServeHTTP(ctx *fasthttp.RequestCtx) {
 	// circuit breaker is open?
 	_, _, _, _, ratio := n.query()
 	if ratio > 0.3 {
+		// fallback
 		log.Printf("too many requests, ratio is %f", ratio)
+		switch a.fallbackType {
+		case fallbackJSON:
+			ctx.SetContentType("application/json")
+		case fallbackHTML, fallbackHTMLFile:
+			ctx.SetContentType("text/html")
+		case fallbackTEXT:
+			ctx.SetContentType("text/plain")
+		default:
+			ctx.SetContentType("text/plain")
+		}
 		ctx.SetStatusCode(fasthttp.StatusTooManyRequests)
+		ctx.Write(a.FallbackContent)
+
 		return
 	}
 
