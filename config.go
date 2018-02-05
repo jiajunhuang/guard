@@ -37,7 +37,7 @@ type appConfig struct {
 	Paths             []string `json:"paths"`
 	Methods           []string `json:"methods"`
 	FallbackType      string   `json:"fallback_type"`
-	FallbackContent   []byte   `json:"fallback_content"`
+	FallbackContent   string   `json:"fallback_content"`
 }
 
 func checkAppConfig(a *appConfig) error {
@@ -62,17 +62,17 @@ func checkAppConfig(a *appConfig) error {
 	case "", fallbackTEXT:
 		a.FallbackType = fallbackTEXT
 		if len(a.FallbackContent) == 0 {
-			a.FallbackContent = []byte("too many requests")
+			a.FallbackContent = "too many requests"
 		}
 	case fallbackJSON, fallbackHTML:
 
 	case fallbackHTMLFile:
-		html, err := ioutil.ReadFile(string(a.FallbackContent))
+		html, err := ioutil.ReadFile(a.FallbackContent)
 		if err != nil {
 			return err
 		}
 		a.FallbackType = fallbackHTML
-		a.FallbackContent = html
+		a.FallbackContent = string(html)
 	default:
 		return errBadFallbackType
 	}
@@ -114,7 +114,7 @@ func getAPP(config *appConfig) *Application {
 	}
 
 	app.fallbackType = config.FallbackType
-	app.FallbackContent = config.FallbackContent
+	app.FallbackContent = []byte(config.FallbackContent)
 
 	return app
 }
@@ -131,7 +131,7 @@ func appHandler(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&config); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("bad configuration"))
+		w.Write([]byte("bad configuration: " + err.Error()))
 		return
 	}
 

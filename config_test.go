@@ -88,40 +88,40 @@ func TestCheckAPPConfig(t *testing.T) {
 
 	// "" or text
 	config.FallbackType = ""
-	content := []byte("too many requests")
+	content := "too many requests"
 	if err := checkAppConfig(config); err != nil {
 		t.Errorf("should not return error but got: %s", err)
 	}
-	if config.FallbackType != fallbackTEXT || !bytes.Equal(config.FallbackContent, content) {
+	if config.FallbackType != fallbackTEXT || config.FallbackContent != content {
 		t.Errorf("fallback options error: %s, %s", config.FallbackType, config.FallbackContent)
 	}
 	config.FallbackType = fallbackTEXT
 	if err := checkAppConfig(config); err != nil {
 		t.Errorf("should not return error but got: %s", err)
 	}
-	if config.FallbackType != fallbackTEXT || !bytes.Equal(config.FallbackContent, content) {
+	if config.FallbackType != fallbackTEXT || config.FallbackContent != content {
 		t.Errorf("fallback options error: %s, %s", config.FallbackType, config.FallbackContent)
 	}
 
 	// "json"
 	config.FallbackType = fallbackJSON
-	content = []byte("{}")
+	content = "{}"
 	config.FallbackContent = content
 	if err := checkAppConfig(config); err != nil {
 		t.Errorf("should not return error but got: %s", err)
 	}
-	if config.FallbackType != fallbackJSON || !bytes.Equal(config.FallbackContent, content) {
+	if config.FallbackType != fallbackJSON || config.FallbackContent != content {
 		t.Errorf("fallback options error: %s, %s", config.FallbackType, config.FallbackContent)
 	}
 
 	// "html"
 	config.FallbackType = fallbackHTML
-	content = []byte("<html></html>")
+	content = "<html></html>"
 	config.FallbackContent = content
 	if err := checkAppConfig(config); err != nil {
 		t.Errorf("should not return error but got: %s", err)
 	}
-	if config.FallbackType != fallbackHTML || !bytes.Equal(config.FallbackContent, content) {
+	if config.FallbackType != fallbackHTML || config.FallbackContent != content {
 		t.Errorf("fallback options error: %s, %s", config.FallbackType, config.FallbackContent)
 	}
 
@@ -130,7 +130,7 @@ func TestCheckAPPConfig(t *testing.T) {
 	filePath := "/tmp/test_guard_html_file_path.html"
 	os.Remove(filePath)
 	config.FallbackType = fallbackHTMLFile
-	config.FallbackContent = []byte(filePath)
+	config.FallbackContent = filePath
 	if err := checkAppConfig(config); err == nil {
 		t.Errorf("should return error but not")
 	}
@@ -141,12 +141,12 @@ func TestCheckAPPConfig(t *testing.T) {
 		t.Errorf("failed to open %s: %s", filePath, err)
 	}
 	defer f.Close()
-	content = []byte("<html></html>")
-	f.Write(content)
+	content = "<html></html>"
+	f.Write([]byte(content))
 	if err := checkAppConfig(config); err != nil {
 		t.Errorf("should not return error, but got: %s", err)
 	}
-	if config.FallbackType != fallbackHTML || !bytes.Equal(config.FallbackContent, content) {
+	if config.FallbackType != fallbackHTML || config.FallbackContent != content {
 		t.Errorf("fallback options error: %s, %s", config.FallbackType, config.FallbackContent)
 	}
 
@@ -198,7 +198,7 @@ func TestConfigKeeper(t *testing.T) {
 		[]string{"/"},
 		[]string{"GET"},
 		"",
-		[]byte("too many requests"),
+		"too many requests",
 	}
 
 	go configKeeper()
