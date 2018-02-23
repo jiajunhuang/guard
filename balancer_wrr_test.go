@@ -14,7 +14,13 @@ func TestWRRFound(t *testing.T) {
 	b2 := NewBackend(h2, 1)
 	b3 := NewBackend(h3, 1)
 
-	wrr := NewWRR(b1, b2, b3)
+	wrr := NewWRR(b1)
+	_, found := wrr.Select()
+	if !found {
+		t.Errorf("one backend should found")
+	}
+
+	wrr = NewWRR(b1, b2, b3)
 
 	var r *Backend
 	var f bool
@@ -54,7 +60,15 @@ func TestWRRNotFound(t *testing.T) {
 	b2 := NewBackend(h2, 0)
 	b3 := NewBackend(h3, 0)
 
-	wrr := NewWRR(b1, b2, b3)
+	// no backends
+	wrr := NewWRR()
+	_, found := wrr.Select()
+	if found {
+		t.Errorf("no backend should found")
+	}
+
+	// backends with weight 0
+	wrr = NewWRR(b1, b2, b3)
 
 	var r *Backend
 	var f bool
