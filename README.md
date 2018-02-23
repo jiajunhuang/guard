@@ -99,7 +99,9 @@ $ guard
     "weights": [5, 1, 1],
     "ratio": 0.3,
     "paths": ["/"],
-    "methods": ["GET"]
+    "methods": ["GET"],
+    "fallback_type": "text",
+    "fallback_content": "hello world"
 }
 ```
 
