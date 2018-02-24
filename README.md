@@ -63,18 +63,7 @@ guard's proxy performance is about 70% of Nginx.~~ guard does not allocate much 
 
 ## TODO
 
-- [x] radix tree(thanks @[httprouter](https://github.com/julienschmidt/httprouter))
-- [x] timeline buckets for statistics
-- [x] load balancer algorithm with weighted round robin
-- [x] load balancer algorithm with round robin
-- [x] load balancer algorithm with random
-- [x] circuit breaker
-- [x] proxy server(thanks @[fasthttp](https://github.com/valyala/fasthttp))
-- [x] dynamic configuration load & save
-- [ ] graceful restart
-- [x] ~~URL-level mutex(remove the bucket-level mutex to gain a better performance)~~ the statistics module is lock-free now
-- [x] fallback option while circuit breaker works(maybe serve a static html page, or return some words.)
-- [ ] more test cases & benchmarks
+moved to https://github.com/jiajunhuang/guard/projects/1
 
 ## Set it up
 
