@@ -14,7 +14,7 @@ fmt:
 	go fmt ./...
 
 vet:
-	go tool vet -v .
+	go vet -v .
 
 test:
 	go test -cover $(COVERPROFILE) -race $(DEBUG) $(ARGS)

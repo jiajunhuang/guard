@@ -3,6 +3,10 @@ package main
 import (
 	"flag"
 	"log"
+	"net"
+	"os"
+	"os/signal"
+	"time"
 
 	"github.com/valyala/fasthttp"
 )
@@ -19,9 +23,31 @@ var (
 
 func main() {
 	flag.Parse()
+	log.Printf("running with pid: %d\n", os.Getpid())
 
+	// config manager
 	go configManager()
-	if err := fasthttp.ListenAndServe(*proxyAddr, breaker.ServeHTTP); err != nil {
+
+	// proxy listener
+	ln, err := net.Listen("tcp", *proxyAddr)
+	if err != nil {
+		log.Fatalf("error while listen at %s: %s", *proxyAddr, err)
+	}
+	gln := newGracefulListener(ln, time.Second*10)
+
+	// singal handler
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		for {
+			<-c
+			log.Printf("graceful shutdown...")
+			gln.Close()
+		}
+	}()
+
+	// proxy server
+	if err := fasthttp.Serve(gln, breaker.ServeHTTP); err != nil {
 		log.Fatalf("error in fasthttp server: %s", err)
 	}
 }
