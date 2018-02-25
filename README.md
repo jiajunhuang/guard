@@ -117,7 +117,7 @@ HTTP/1.1 200 OK
 5. by the way, you can inspect your configuration by visit http://127.0.0.1:12345/ :
 
 ```bash
-http :12345
+$ http :12345
 HTTP/1.1 200 OK
 Content-Length: 235
 Content-Type: application/json
